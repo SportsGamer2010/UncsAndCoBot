@@ -89,15 +89,13 @@ function commandPayloads() {
     )
     .addStringOption((option) =>
       option
-        .setName("claimed-record")
-        .setDescription("Which record do you believe was set?")
+        .setName("record")
+        .setDescription("Which player record was set?")
         .setRequired(true)
         .addChoices(...recordClaimChoices())
     )
     .addAttachmentOption((option) => option.setName("screenshot").setDescription("End-of-game box score screenshot").setRequired(true))
-    .addUserOption((option) => option.setName("record-holder").setDescription("Discord member who set the record").setRequired(true))
-    .addStringOption((option) => option.setName("opponent").setDescription("Opponent crew/team name").setRequired(false).setMaxLength(60))
-    .addStringOption((option) => option.setName("notes").setDescription("Optional context for staff").setRequired(false).setMaxLength(240));
+    .addUserOption((option) => option.setName("record-holder").setDescription("Discord member who set the record").setRequired(true));
 
   const records = new SlashCommandBuilder()
     .setName("records")
@@ -112,7 +110,7 @@ function commandPayloads() {
 
   const recordBook = new SlashCommandBuilder()
     .setName("recordbook")
-    .setDescription("Manage the crew record book channel.")
+    .setDescription("Manage the player record book channel.")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((subcommand) => subcommand.setName("setup").setDescription("Create or refresh the Statistics > record-book channel."))
     .addSubcommand((subcommand) => subcommand.setName("refresh").setDescription("Refresh record-book embeds from saved submissions."));
@@ -196,10 +194,8 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   }
 
   const mode = interaction.options.getString("mode", true) as GameMode;
-  const claimedRecord = interaction.options.getString("claimed-record", true) as RecordClaim;
+  const claimedRecord = interaction.options.getString("record", true) as RecordClaim;
   const claimedRecordHolder = interaction.options.getUser("record-holder", true);
-  const opponentName = interaction.options.getString("opponent") ?? undefined;
-  const notes = interaction.options.getString("notes") ?? undefined;
   const channel = await ensureRecordBookChannel(interaction.guild, config);
   const playerLines = await attachDiscordMembers(interaction.guild, parsed.playerLines, claimedRecordHolder);
   const teamTotals = totalStats(playerLines);
@@ -214,8 +210,6 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
     submittedByTag: interaction.user.tag,
     submittedAt: new Date().toISOString(),
     mode,
-    opponentName,
-    notes,
     claimedRecord,
     claimedRecordHolderId: claimedRecordHolder?.id,
     claimedRecordHolderTag: claimedRecordHolder?.tag,

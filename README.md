@@ -13,8 +13,8 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Creates/refreshes `Statistics` > `#record-book` with `/recordbook setup`
 - Pins a clear instruction embed explaining that screenshots are required
 - Accepts player submissions through `/submit-record`
-- Asks players which record they believe was set
-- Optionally links a claimed player record to a Discord member
+- Asks players which player record was set
+- Links the submitted player record to a Discord member
 - Extracts stat rows from the screenshot with local Tesseract OCR
 - Compares OCR stats against saved mode records and flags newly broken records
 - Awards mode/stat record-holder roles for verified individual records when Discord member matching succeeds
@@ -121,10 +121,9 @@ Railway should use `railway.json` and the included `Dockerfile` automatically af
 2. The bot creates or updates `Statistics` > `#record-book`.
 3. Players run `/submit-record` in `#record-book` and provide:
    - `mode`: Rec, Pro-Am, or Theater
-   - `claimed-record`: the record they believe was set, or "Not sure"
+   - `record`: the player record that was set, or "Not sure"
    - `record-holder`: Discord member who set the individual record
    - `screenshot`: end-of-game box score image
-   - optional opponent/notes
 4. The bot reads the screenshot, matches OCR player names to Discord members when possible, checks for new player records, saves the result, posts a confirmation embed, and refreshes the record book.
 
 When a Discord member is matched to a verified individual record, the bot creates/assigns a role such as `Rec BLK Record Holder`. The bot's server role must be higher than those record-holder roles for assignment to work.

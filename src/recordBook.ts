@@ -17,7 +17,7 @@ export function buildOverviewEmbed(channelName: string): EmbedBuilder {
         "**How records are recorded:**",
         "1. Play your game.",
         "2. Capture the end-of-game box score screenshot.",
-        "3. Run `/submit-record`, choose the player record you believe was set, tag the record holder, and attach the screenshot.",
+        "3. Run `/submit-record`, choose the player record that was set, tag the record holder, and attach the screenshot.",
         "",
         "Only screenshot-backed submissions are saved to the record book. The bot also checks the OCR stats against saved records and flags new records automatically."
       ].join("\n")
@@ -25,11 +25,7 @@ export function buildOverviewEmbed(channelName: string): EmbedBuilder {
     .addFields(
       {
         name: "Required with every submission",
-        value: "`mode`, `claimed-record`, `record-holder`, and a screenshot attachment."
-      },
-      {
-        name: "Recommended",
-        value: "Add opponent and notes when available so staff have context for the screenshot."
+        value: "`mode`, `record`, `record-holder`, and a screenshot attachment."
       }
     )
     .setFooter({ text: `Post submissions in #${channelName}. Records refresh automatically after approved screenshots.` })
@@ -55,16 +51,14 @@ export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
     .setDescription(
       [
         `Submitted a **${GAME_MODE_LABELS[entry.mode]}** player-record screenshot.`,
-        entry.claimedRecordHolderId ? `Claimed holder: <@${entry.claimedRecordHolderId}>` : undefined,
-        entry.opponentName ? `Opponent: **${entry.opponentName}**` : undefined,
-        entry.notes ? `Notes: ${entry.notes}` : undefined
+        entry.claimedRecordHolderId ? `Record holder: <@${entry.claimedRecordHolderId}>` : undefined
       ]
         .filter(Boolean)
         .join("\n")
     )
     .addFields(
       {
-        name: "Claimed Record",
+        name: "Submitted Record",
         value: formatClaimedRecord(entry)
       },
       {
@@ -123,7 +117,7 @@ function formatIndividualRecords(entries: RecordEntry[], recordsPerMode: number)
         return undefined;
       }
 
-      return `**${RECORD_STAT_LABELS[key]}** ${best.line[key]} - ${formatPlayer(best.line)}${best.entry.opponentName ? ` vs ${best.entry.opponentName}` : ""}`;
+      return `**${RECORD_STAT_LABELS[key]}** ${best.line[key]} - ${formatPlayer(best.line)}`;
     })
     .filter(Boolean)
     .slice(0, recordsPerMode)
