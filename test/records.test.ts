@@ -8,16 +8,23 @@ describe("detectNewRecords", () => {
   it("detects new player records against prior entries", () => {
     const prior = makeEntry({
       totals: { points: 82, rebounds: 21, assists: 18, steals: 5, blocks: 3, turnovers: 6 },
-      stats: [{ playerName: "Old Guard", points: 32, rebounds: 2, assists: 8, steals: 1, blocks: 0, turnovers: 2 }]
+      stats: [
+        { playerName: "Old Guard", points: 32, rebounds: 2, assists: 8, steals: 1, blocks: 0, turnovers: 2 },
+        { playerName: "Old Rim", points: 8, rebounds: 11, assists: 1, steals: 1, blocks: 5, turnovers: 1 }
+      ]
     });
     const current = makeEntry({
       totals: { points: 95, rebounds: 20, assists: 19, steals: 4, blocks: 2, turnovers: 5 },
-      stats: [{ playerName: "Unc Buckets", discordUserId: "123", discordDisplayName: "Unc Buckets", points: 45, rebounds: 3, assists: 7, steals: 2, blocks: 0, turnovers: 1 }]
+      stats: [
+        { playerName: "Unc Buckets", discordUserId: "123", discordDisplayName: "Unc Buckets", points: 45, rebounds: 3, assists: 7, steals: 2, blocks: 0, turnovers: 1 },
+        { playerName: "OGSportsGamer", discordUserId: "456", discordDisplayName: "OGSportsGamer", points: 0, rebounds: 17, assists: 1, steals: 0, blocks: 7, turnovers: 2 }
+      ]
     });
 
     const records = detectNewRecords([prior], current);
 
     assert(records.some((record) => record.scope === "player" && record.statKey === "points" && record.value === 45 && record.discordUserId === "123"));
+    assert(records.some((record) => record.scope === "player" && record.statKey === "blocks" && record.value === 7 && record.discordUserId === "456"));
     assert(!records.some((record) => record.scope === "team"));
   });
 

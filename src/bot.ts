@@ -17,9 +17,9 @@ import type { AppConfig } from "./config.js";
 import { attachDiscordMembers } from "./members.js";
 import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } from "./ocr.js";
 import { buildModeEmbed, buildOverviewEmbed, buildRecordAnnouncementEmbed, buildSubmissionEmbed } from "./recordBook.js";
-import { detectNewRecords } from "./records.js";
+import { detectNewRecords, parseClaimScope } from "./records.js";
 import { DuplicateScreenshotError, hashImage, RecordBookStore } from "./storage.js";
-import { GAME_MODE_LABELS, GAME_MODES, PLAYER_RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
+import { GAME_MODE_LABELS, GAME_MODES, PLAYER_RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type PlayerStatLine, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
 
 const INSTRUCTION_TOPIC =
   "Submit end-of-game NBA 2K screenshots with /submit-record. Records are saved only from screenshot-backed submissions.";
@@ -207,7 +207,8 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
     throw new Error("I could not find that record holder in this Discord server. Use the record-holder search dropdown and select a member.");
   }
   const channel = await ensureRecordBookChannel(interaction.guild, config);
-  const playerLines = await attachDiscordMembers(interaction.guild, parsed.playerLines, claimedRecordHolderMember.user);
+  const matchedPlayerLines = await attachDiscordMembers(interaction.guild, parsed.playerLines, claimedRecordHolderMember.user);
+  const playerLines = applyClaimedHolderFallback(matchedPlayerLines, claimedRecord, claimedRecordHolderMember);
   const teamTotals = totalStats(playerLines);
   const { playerName: _playerName, teammateGrade: _teammateGrade, ...totals } = teamTotals;
   const priorModeEntries = await store.entriesForMode(interaction.guild.id, mode);
@@ -245,6 +246,39 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   await publishRecordBook(interaction.guild, channel, config, store);
 
   await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} player-record submission for <@${claimedRecordHolderMember.id}>. The record book has been refreshed in ${channel}.`);
+}
+
+function applyClaimedHolderFallback(lines: PlayerStatLine[], claimedRecord: RecordClaim, member: GuildMember): PlayerStatLine[] {
+  if (lines.some((line) => line.discordUserId === member.id)) {
+    return lines;
+  }
+
+  const parsedClaim = parseClaimScope(claimedRecord);
+  if (!parsedClaim || parsedClaim.scope !== "player") {
+    return lines;
+  }
+
+  const bestIndex = lines.reduce<number>((currentBestIndex, line, index) => {
+    if (currentBestIndex === -1 || line[parsedClaim.statKey] > lines[currentBestIndex][parsedClaim.statKey]) {
+      return index;
+    }
+
+    return currentBestIndex;
+  }, -1);
+
+  if (bestIndex === -1) {
+    return lines;
+  }
+
+  return lines.map((line, index) =>
+    index === bestIndex
+      ? {
+          ...line,
+          discordUserId: member.id,
+          discordDisplayName: member.displayName
+        }
+      : line
+  );
 }
 
 async function handleAutocomplete(interaction: { commandName: string; guild: Guild | null; options: { getFocused(): string | number }; respond(choices: { name: string; value: string }[]): Promise<void> }): Promise<void> {
