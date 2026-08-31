@@ -30,7 +30,7 @@ Create a Discord application/bot in the Discord Developer Portal and enable thes
 - `Manage Channels`
 - `Manage Messages` (recommended so the bot can pin the instruction message)
 - Server Members intent is not required
-- Message Content intent is only used to remind players who drop screenshots without `/submit-record`
+- Message Content intent is not required
 
 Invite the bot with the `bot` and `applications.commands` scopes.
 

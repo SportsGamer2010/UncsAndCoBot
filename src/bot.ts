@@ -3,7 +3,6 @@ import {
   ChannelType,
   ChatInputCommandInteraction,
   Client,
-  EmbedBuilder,
   GatewayIntentBits,
   Guild,
   Message,
@@ -22,7 +21,7 @@ const INSTRUCTION_TOPIC =
 
 export function createBot(config: AppConfig, store: RecordBookStore): Client {
   const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+    intents: [GatewayIntentBits.Guilds]
   });
 
   client.once("ready", async () => {
@@ -64,10 +63,6 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
       console.error(error);
       await safeInteractionReply(interaction, friendlyError(error));
     }
-  });
-
-  client.on("messageCreate", async (message) => {
-    await handleLooseScreenshotMessage(message, config);
   });
 
   return client;
@@ -208,32 +203,6 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   await publishRecordBook(interaction.guild, channel, config, store);
 
   await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} submission for ${crewName}. The record book has been refreshed in ${channel}.`);
-}
-
-async function handleLooseScreenshotMessage(message: Message, config: AppConfig): Promise<void> {
-  if (message.author.bot || !message.guild || message.channel.type !== ChannelType.GuildText) {
-    return;
-  }
-
-  if (message.channel.name !== config.RECORD_BOOK_CHANNEL_NAME) {
-    return;
-  }
-
-  const hasImage = message.attachments.some((attachment) => isSupportedImage(attachment.name, attachment.contentType));
-  if (!hasImage) {
-    return;
-  }
-
-  await message.reply({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0xf2cc60)
-        .setTitle("Use /submit-record so the screenshot can be saved")
-        .setDescription(
-          "I see a screenshot here. To record it, run `/submit-record` with the mode, crew name, result, and this screenshot attached. That keeps the record book accurate and searchable."
-        )
-    ]
-  });
 }
 
 async function ensureRecordBookChannel(guild: Guild, config: AppConfig): Promise<TextChannel> {
