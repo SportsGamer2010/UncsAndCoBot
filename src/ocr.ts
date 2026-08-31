@@ -133,7 +133,10 @@ function findFirstStatIndex(line: string): number {
 }
 
 function cleanPlayerName(name: string): string {
-  return name
+  const markerIndex = Math.max(name.lastIndexOf("©"), name.lastIndexOf("@"));
+  const withoutIconPrefix = markerIndex >= 0 && markerIndex < name.length - 1 ? name.slice(markerIndex + 1) : name;
+
+  return withoutIconPrefix
     .replace(/[|()[\]{}]/g, "")
     .replace(/\s+/g, " ")
     .replace(/^[^A-Za-z0-9_.-]+/, "")

@@ -50,10 +50,19 @@ Big Boardz        B+  12  18  3   0   4   3   1  5   7   0   0
     const parsed = parseStatsText(". @ 0GSoortsGamer A [J] 17 1 0 7 1 2 01 0 00 4");
 
     assert.equal(parsed.playerLines.length, 1);
+    assert.equal(parsed.playerLines[0]?.playerName, "0GSoortsGamer");
     assert.equal(parsed.playerLines[0]?.points, 0);
     assert.equal(parsed.playerLines[0]?.rebounds, 17);
     assert.equal(parsed.playerLines[0]?.assists, 1);
     assert.equal(parsed.playerLines[0]?.blocks, 7);
     assert.equal(parsed.playerLines[0]?.turnovers, 2);
+  });
+
+  it("removes NBA 2K icon prefixes before player names", () => {
+    const parsed = parseStatsText("! rons To © HunchoQuise23 A 29 1 2 3 0 1 0 12/18 5/8 0/3");
+
+    assert.equal(parsed.playerLines.length, 1);
+    assert.equal(parsed.playerLines[0]?.playerName, "HunchoQuise23");
+    assert.equal(parsed.playerLines[0]?.points, 29);
   });
 });
