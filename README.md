@@ -122,13 +122,15 @@ Railway should use `railway.json` and the included `Dockerfile` automatically af
 3. Players run `/submit-record` in `#record-book` and provide:
    - `mode`: Rec, Pro-Am, or Theater
    - `record`: the player record that was set, or "Not sure"
-   - `record-holder`: Discord member who set the individual record
+   - `record-holder`: searchable Discord member who set the individual record
    - `screenshot`: end-of-game box score image
 4. The bot reads the screenshot, matches OCR player names to Discord members when possible, checks for new player records, saves the result, posts a confirmation embed, and refreshes the record book.
 
 When a Discord member is matched to a verified individual record, the bot creates/assigns a role such as `Rec BLK Record Holder`. The bot's server role must be higher than those record-holder roles for assignment to work.
 
 Members can also run `/records` to view current player records by mode.
+
+Discord limits autocomplete dropdowns to 25 results. In `record-holder`, type part of the player's Discord display name or username, then select the matching member.
 
 ## Persistence
 

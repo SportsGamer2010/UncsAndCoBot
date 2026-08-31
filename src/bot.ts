@@ -6,6 +6,7 @@ import {
   EmbedBuilder,
   GatewayIntentBits,
   Guild,
+  GuildMember,
   Message,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -51,6 +52,11 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
   });
 
   client.on("interactionCreate", async (interaction) => {
+    if (interaction.isAutocomplete()) {
+      await handleAutocomplete(interaction);
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) {
       return;
     }
@@ -95,7 +101,7 @@ function commandPayloads() {
         .addChoices(...recordClaimChoices())
     )
     .addAttachmentOption((option) => option.setName("screenshot").setDescription("End-of-game box score screenshot").setRequired(true))
-    .addUserOption((option) => option.setName("record-holder").setDescription("Discord member who set the record").setRequired(true));
+    .addStringOption((option) => option.setName("record-holder").setDescription("Search and select the Discord member who set the record").setRequired(true).setAutocomplete(true));
 
   const records = new SlashCommandBuilder()
     .setName("records")
@@ -195,9 +201,13 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
 
   const mode = interaction.options.getString("mode", true) as GameMode;
   const claimedRecord = interaction.options.getString("record", true) as RecordClaim;
-  const claimedRecordHolder = interaction.options.getUser("record-holder", true);
+  const claimedRecordHolderId = interaction.options.getString("record-holder", true);
+  const claimedRecordHolderMember = await interaction.guild.members.fetch(claimedRecordHolderId).catch(() => undefined);
+  if (!claimedRecordHolderMember) {
+    throw new Error("I could not find that record holder in this Discord server. Use the record-holder search dropdown and select a member.");
+  }
   const channel = await ensureRecordBookChannel(interaction.guild, config);
-  const playerLines = await attachDiscordMembers(interaction.guild, parsed.playerLines, claimedRecordHolder);
+  const playerLines = await attachDiscordMembers(interaction.guild, parsed.playerLines, claimedRecordHolderMember.user);
   const teamTotals = totalStats(playerLines);
   const { playerName: _playerName, teammateGrade: _teammateGrade, ...totals } = teamTotals;
   const priorModeEntries = await store.entriesForMode(interaction.guild.id, mode);
@@ -211,8 +221,8 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
     submittedAt: new Date().toISOString(),
     mode,
     claimedRecord,
-    claimedRecordHolderId: claimedRecordHolder?.id,
-    claimedRecordHolderTag: claimedRecordHolder?.tag,
+    claimedRecordHolderId: claimedRecordHolderMember.id,
+    claimedRecordHolderTag: claimedRecordHolderMember.displayName,
     screenshotUrl: attachment.url,
     screenshotHash: hashImage(image),
     stats: playerLines,
@@ -231,7 +241,42 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   await channel.send({ embeds: [buildSubmissionEmbed(entry)] });
   await publishRecordBook(interaction.guild, channel, config, store);
 
-  await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} player-record submission for ${claimedRecordHolder}. The record book has been refreshed in ${channel}.`);
+  await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} player-record submission for <@${claimedRecordHolderMember.id}>. The record book has been refreshed in ${channel}.`);
+}
+
+async function handleAutocomplete(interaction: { commandName: string; guild: Guild | null; options: { getFocused(): string | number }; respond(choices: { name: string; value: string }[]): Promise<void> }): Promise<void> {
+  if (interaction.commandName !== "submit-record" || !interaction.guild) {
+    await interaction.respond([]);
+    return;
+  }
+
+  const focused = String(interaction.options.getFocused() ?? "").trim();
+  const members = await searchMembers(interaction.guild, focused);
+  await interaction.respond(members.map(formatMemberChoice));
+}
+
+async function searchMembers(guild: Guild, query: string): Promise<GuildMember[]> {
+  if (query.length > 0) {
+    const searched = await guild.members.search({ query, limit: 25 }).catch((error) => {
+      console.warn("Discord member autocomplete search failed; falling back to cached members.", error);
+      return undefined;
+    });
+
+    if (searched) {
+      return [...searched.values()].filter((member) => !member.user.bot);
+    }
+  }
+
+  return guild.members.cache.filter((member) => !member.user.bot).first(25);
+}
+
+function formatMemberChoice(member: GuildMember): { name: string; value: string } {
+  const username = member.user.discriminator === "0" ? member.user.username : member.user.tag;
+  const label = member.displayName === member.user.username ? username : `${member.displayName} (${username})`;
+  return {
+    name: label.slice(0, 100),
+    value: member.id
+  };
 }
 
 async function handleRecordsCommand(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
