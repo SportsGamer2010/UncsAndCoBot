@@ -73,6 +73,10 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
       if (interaction.commandName === "records") {
         await handleRecordsCommand(interaction, config, store);
       }
+
+      if (interaction.commandName === "team-records") {
+        await handleRecordsCommand(interaction, config, store);
+      }
     } catch (error) {
       console.error(error);
       await safeInteractionReply(interaction, friendlyError(error));
@@ -114,6 +118,17 @@ function commandPayloads() {
         .addChoices(...GAME_MODES.map((mode) => ({ name: GAME_MODE_LABELS[mode], value: mode })))
     );
 
+  const teamRecords = new SlashCommandBuilder()
+    .setName("team-records")
+    .setDescription("View the Uncs & Co player record book.")
+    .addStringOption((option) =>
+      option
+        .setName("mode")
+        .setDescription("Game mode to view")
+        .setRequired(false)
+        .addChoices(...GAME_MODES.map((mode) => ({ name: GAME_MODE_LABELS[mode], value: mode })))
+    );
+
   const recordBook = new SlashCommandBuilder()
     .setName("recordbook")
     .setDescription("Manage the player record book channel.")
@@ -122,7 +137,7 @@ function commandPayloads() {
     .addSubcommand((subcommand) => subcommand.setName("refresh").setDescription("Refresh record-book embeds from saved submissions."))
     .addSubcommand((subcommand) => subcommand.setName("latest").setDescription("View the latest saved submission details privately."));
 
-  return [submitRecord.toJSON(), records.toJSON(), recordBook.toJSON()];
+  return [submitRecord.toJSON(), records.toJSON(), teamRecords.toJSON(), recordBook.toJSON()];
 }
 
 function recordClaimChoices(): { name: string; value: RecordClaim }[] {

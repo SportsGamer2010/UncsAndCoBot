@@ -23,7 +23,7 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Saves every valid record to `data/record-book.json`
 - Prevents duplicate screenshot submissions by image hash
 - Publishes single-game player records for points, rebounds, assists, steals, and blocks
-- Provides `/records` so members can view saved player records
+- Provides `/records` and `/team-records` so members can view saved player records
 
 ## Discord bot requirements
 
@@ -132,7 +132,7 @@ In production, relative `DATA_DIR` values are forced to `/data` so Railway does 
 
 When a Discord member is matched to a verified individual record, the bot creates/assigns a role such as `Rec BLK Record Holder`. The bot's server role must be higher than those record-holder roles for assignment to work.
 
-Members can also run `/records` to view current player records by mode.
+Members can also run `/records` or `/team-records` to view current player records by mode.
 
 Discord limits autocomplete dropdowns to 25 results. In `record-holder`, type part of the player's Discord display name or username, then select the matching member.
 
