@@ -47,7 +47,7 @@ export function buildModeEmbed(mode: GameMode, entries: RecordEntry[], recordsPe
 export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(entry.detectedRecords.length > 0 ? 0x2ea043 : 0x1f6feb)
-    .setTitle("Screenshot Recorded")
+    .setTitle("Admin Submission Details")
     .setDescription(
       [
         `Submitted a **${GAME_MODE_LABELS[entry.mode]}** player-record screenshot.`,
@@ -75,12 +75,18 @@ export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
     .setTimestamp(new Date(entry.submittedAt));
 }
 
-export function buildRecordAnnouncementEmbed(entry: RecordEntry): EmbedBuilder {
+export function buildPublicSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
   return new EmbedBuilder()
-    .setColor(0xf0b429)
-    .setTitle(`New ${GAME_MODE_LABELS[entry.mode]} Player Record`)
-    .setDescription(formatDetectedRecords(entry.detectedRecords))
+    .setColor(entry.detectedRecords.length > 0 ? 0xf0b429 : 0x1f6feb)
+    .setTitle(entry.detectedRecords.length > 0 ? `New ${GAME_MODE_LABELS[entry.mode]} Player Record` : "Screenshot Reviewed")
+    .setDescription(entry.detectedRecords.length > 0 ? formatDetectedRecords(entry.detectedRecords) : "No new saved player record was detected from this screenshot.")
+    .addFields({
+      name: "Record Holder",
+      value: entry.claimedRecordHolderId ? `<@${entry.claimedRecordHolderId}>` : "Unknown holder",
+      inline: true
+    })
     .setFooter({ text: "Verified from an end-of-game screenshot" })
+    .setImage(entry.screenshotUrl)
     .setTimestamp(new Date(entry.submittedAt));
 }
 

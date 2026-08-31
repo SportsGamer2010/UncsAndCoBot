@@ -16,7 +16,7 @@ import { syncAchievementRoles } from "./achievements.js";
 import type { AppConfig } from "./config.js";
 import { attachDiscordMembers } from "./members.js";
 import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } from "./ocr.js";
-import { buildModeEmbed, buildOverviewEmbed, buildRecordAnnouncementEmbed, buildSubmissionEmbed } from "./recordBook.js";
+import { buildModeEmbed, buildOverviewEmbed, buildPublicSubmissionEmbed, buildSubmissionEmbed } from "./recordBook.js";
 import { detectNewRecords, parseClaimScope } from "./records.js";
 import { DuplicateScreenshotError, hashImage, RecordBookStore } from "./storage.js";
 import { GAME_MODE_LABELS, GAME_MODES, PLAYER_RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type PlayerStatLine, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
@@ -119,7 +119,8 @@ function commandPayloads() {
     .setDescription("Manage the player record book channel.")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((subcommand) => subcommand.setName("setup").setDescription("Create or refresh the Statistics > record-book channel."))
-    .addSubcommand((subcommand) => subcommand.setName("refresh").setDescription("Refresh record-book embeds from saved submissions."));
+    .addSubcommand((subcommand) => subcommand.setName("refresh").setDescription("Refresh record-book embeds from saved submissions."))
+    .addSubcommand((subcommand) => subcommand.setName("latest").setDescription("View the latest saved submission details privately."));
 
   return [submitRecord.toJSON(), records.toJSON(), recordBook.toJSON()];
 }
@@ -174,6 +175,19 @@ async function handleRecordBookCommand(interaction: ChatInputCommandInteraction,
   }
 
   await interaction.deferReply({ ephemeral: true });
+  const subcommand = interaction.options.getSubcommand();
+  if (subcommand === "latest") {
+    const data = await store.read();
+    const latest = data.entries.find((entry) => entry.guildId === interaction.guild?.id);
+    if (!latest) {
+      await interaction.editReply("No saved submissions yet.");
+      return;
+    }
+
+    await interaction.editReply({ embeds: [buildSubmissionEmbed(latest)] });
+    return;
+  }
+
   const channel = await ensureRecordBookChannel(interaction.guild, config);
   await publishRecordBook(interaction.guild, channel, config, store);
 
@@ -239,10 +253,7 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   await syncAchievementRoles(interaction.guild, entry).catch((error) => {
     console.error("Failed to sync achievement roles:", error);
   });
-  await channel.send({ embeds: [buildSubmissionEmbed(entry)] });
-  if (entry.detectedRecords.length > 0) {
-    await channel.send({ content: "New player record set.", embeds: [buildRecordAnnouncementEmbed(entry)] });
-  }
+  await channel.send({ content: entry.detectedRecords.length > 0 ? "New player record set." : undefined, embeds: [buildPublicSubmissionEmbed(entry)] });
   await publishRecordBook(interaction.guild, channel, config, store);
 
   await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} player-record submission for <@${claimedRecordHolderMember.id}>. The record book has been refreshed in ${channel}.`);

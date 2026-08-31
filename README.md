@@ -18,6 +18,7 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Extracts stat rows from the screenshot with local Tesseract OCR
 - Compares OCR stats against saved mode records and flags newly broken records
 - Posts a group-visible notification when a new player record is set
+- Keeps detailed OCR/submission info admin-only through `/recordbook latest`
 - Awards mode/stat record-holder roles for verified individual records when Discord member matching succeeds
 - Saves every valid record to `data/record-book.json`
 - Prevents duplicate screenshot submissions by image hash
@@ -134,6 +135,8 @@ When a Discord member is matched to a verified individual record, the bot create
 Members can also run `/records` to view current player records by mode.
 
 Discord limits autocomplete dropdowns to 25 results. In `record-holder`, type part of the player's Discord display name or username, then select the matching member.
+
+Admins can run `/recordbook latest` to privately view the latest submission details, including parsed player rows.
 
 ## Persistence
 
