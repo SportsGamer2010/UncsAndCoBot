@@ -45,10 +45,10 @@ Edit `.env`:
 
 ```bash
 DISCORD_TOKEN=your-bot-token
-DISCORD_GUILD_ID=your-server-id
+DISCORD_GUILD_ID=1539616713501310996
 ```
 
-`DISCORD_GUILD_ID` is optional, but recommended. When set, slash commands update immediately in that server.
+`1539616713501310996` is the Uncs & Co server ID. Keeping `DISCORD_GUILD_ID` set makes slash commands update immediately in that server.
 
 ## Run locally
 
@@ -62,6 +62,40 @@ For production:
 npm run build
 npm start
 ```
+
+## Deploy
+
+This is a long-running Discord bot, so it should run on a host that supports persistent background services such as Railway, Fly.io, Render Background Workers, a VPS, or a Docker host. It is not a Vercel/static-site style deployment.
+
+### Docker
+
+Build the image:
+
+```bash
+docker build -t uncs-record-book-bot .
+```
+
+Run it with a persistent data volume:
+
+```bash
+docker run -d \
+  --name uncs-record-book-bot \
+  --restart unless-stopped \
+  -e DISCORD_TOKEN=your-bot-token \
+  -e DISCORD_GUILD_ID=1539616713501310996 \
+  -v uncs-record-book-data:/data \
+  uncs-record-book-bot
+```
+
+### Hosted services
+
+Use these settings on a bot-friendly host:
+
+- Build command: `npm ci && npm run build`
+- Start command: `npm start`
+- Required environment variable: `DISCORD_TOKEN`
+- Recommended environment variable: `DISCORD_GUILD_ID=1539616713501310996`
+- Persistent disk/volume path: `/data`
 
 ## Server workflow
 
