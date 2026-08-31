@@ -20,8 +20,8 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Awards mode/stat record-holder roles for verified individual records when Discord member matching succeeds
 - Saves every valid record to `data/record-book.json`
 - Prevents duplicate screenshot submissions by image hash
-- Tracks crew win/loss records by mode
-- Publishes single-game team records for points, rebounds, assists, steals, and blocks
+- Publishes single-game player records for points, rebounds, assists, steals, and blocks
+- Provides `/records` so members can view saved player records
 
 ## Discord bot requirements
 
@@ -121,15 +121,15 @@ Railway should use `railway.json` and the included `Dockerfile` automatically af
 2. The bot creates or updates `Statistics` > `#record-book`.
 3. Players run `/submit-record` in `#record-book` and provide:
    - `mode`: Rec, Pro-Am, or Theater
-   - `crew`: their crew name
-   - `result`: win or loss
    - `claimed-record`: the record they believe was set, or "Not sure"
+   - `record-holder`: Discord member who set the individual record
    - `screenshot`: end-of-game box score image
-   - optional `record-holder`: Discord member who set an individual record
-   - optional opponent/final score/notes
-4. The bot reads the screenshot, matches OCR player names to Discord members when possible, checks for new team/player records, saves the result, posts a confirmation embed, and refreshes the record book.
+   - optional opponent/notes
+4. The bot reads the screenshot, matches OCR player names to Discord members when possible, checks for new player records, saves the result, posts a confirmation embed, and refreshes the record book.
 
 When a Discord member is matched to a verified individual record, the bot creates/assigns a role such as `Rec BLK Record Holder`. The bot's server role must be higher than those record-holder roles for assignment to work.
+
+Members can also run `/records` to view current player records by mode.
 
 ## Persistence
 

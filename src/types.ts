@@ -41,6 +41,8 @@ export const RECORD_CLAIMS = [
 
 export type RecordClaim = (typeof RECORD_CLAIMS)[number];
 
+export const PLAYER_RECORD_CLAIMS = ["player_points", "player_rebounds", "player_assists", "player_steals", "player_blocks", "not_sure"] as const;
+
 export type RecordScope = "player" | "team";
 
 export interface PlayerStatLine {
@@ -86,9 +88,9 @@ export interface RecordEntry {
   submittedByTag: string;
   submittedAt: string;
   mode: GameMode;
-  crewName: string;
+  crewName?: string;
   opponentName?: string;
-  result: GameResult;
+  result?: GameResult;
   crewScore?: number;
   opponentScore?: number;
   notes?: string;

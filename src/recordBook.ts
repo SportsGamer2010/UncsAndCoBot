@@ -12,12 +12,12 @@ export function buildOverviewEmbed(channelName: string): EmbedBuilder {
     .setTitle("Uncs & Co Crew Record Book")
     .setDescription(
       [
-        `This channel tracks crew records for ${GAME_MODES.map((mode) => `**${GAME_MODE_LABELS[mode]}**`).join(", ")}.`,
+        `This channel tracks screenshot-backed player records for ${GAME_MODES.map((mode) => `**${GAME_MODE_LABELS[mode]}**`).join(", ")}.`,
         "",
         "**How records are recorded:**",
         "1. Play your game.",
         "2. Capture the end-of-game box score screenshot.",
-        "3. Run `/submit-record`, choose the record you believe was set, and attach the screenshot.",
+        "3. Run `/submit-record`, choose the player record you believe was set, tag the record holder, and attach the screenshot.",
         "",
         "Only screenshot-backed submissions are saved to the record book. The bot also checks the OCR stats against saved records and flags new records automatically."
       ].join("\n")
@@ -25,11 +25,11 @@ export function buildOverviewEmbed(channelName: string): EmbedBuilder {
     .addFields(
       {
         name: "Required with every submission",
-        value: "`mode`, `crew`, `result`, `claimed-record`, and a screenshot attachment."
+        value: "`mode`, `claimed-record`, `record-holder`, and a screenshot attachment."
       },
       {
         name: "Recommended",
-        value: "Add opponent and final score when available so standings and point differential stay clean."
+        value: "Add opponent and notes when available so staff have context for the screenshot."
       }
     )
     .setFooter({ text: `Post submissions in #${channelName}. Records refresh automatically after approved screenshots.` })
@@ -42,23 +42,20 @@ export function buildModeEmbed(mode: GameMode, entries: RecordEntry[], recordsPe
   return new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setTitle(`${GAME_MODE_LABELS[mode]} Records`)
-    .setDescription("Crew records and single-game stat records from submitted end-of-game screenshots.")
+    .setDescription("Player single-game records from submitted end-of-game screenshots.")
     .addFields(buildModeFields(modeEntries, recordsPerMode))
     .setFooter({ text: `${modeEntries.length} saved screenshot submission${modeEntries.length === 1 ? "" : "s"}` })
     .setTimestamp(new Date());
 }
 
 export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
-  const score = entry.crewScore !== undefined && entry.opponentScore !== undefined
-    ? ` | Final: ${entry.crewScore}-${entry.opponentScore}`
-    : "";
-
   return new EmbedBuilder()
-    .setColor(entry.result === "win" ? 0x2ea043 : 0xda3633)
+    .setColor(entry.detectedRecords.length > 0 ? 0x2ea043 : 0x1f6feb)
     .setTitle("Screenshot Recorded")
     .setDescription(
       [
-        `**${entry.crewName}** submitted a **${GAME_MODE_LABELS[entry.mode]}** ${entry.result.toUpperCase()}${score}.`,
+        `Submitted a **${GAME_MODE_LABELS[entry.mode]}** player-record screenshot.`,
+        entry.claimedRecordHolderId ? `Claimed holder: <@${entry.claimedRecordHolderId}>` : undefined,
         entry.opponentName ? `Opponent: **${entry.opponentName}**` : undefined,
         entry.notes ? `Notes: ${entry.notes}` : undefined
       ]
@@ -66,10 +63,6 @@ export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
         .join("\n")
     )
     .addFields(
-      {
-        name: "Team Totals Parsed by OCR",
-        value: formatTotals(entry)
-      },
       {
         name: "Claimed Record",
         value: formatClaimedRecord(entry)
@@ -100,16 +93,6 @@ function buildModeFields(entries: RecordEntry[], recordsPerMode: number): APIEmb
   }
 
   return [
-    {
-      name: "Crew Standings",
-      value: formatCrewStandings(entries),
-      inline: false
-    },
-    {
-      name: "Single-Game Team Records",
-      value: formatSingleGameRecords(entries, recordsPerMode),
-      inline: false
-    },
     {
       name: "Individual Single-Game Records",
       value: formatIndividualRecords(entries, recordsPerMode),
@@ -177,7 +160,7 @@ function formatIndividualRecords(entries: RecordEntry[], recordsPerMode: number)
         return undefined;
       }
 
-      return `**${RECORD_STAT_LABELS[key]}** ${best.line[key]} - ${formatPlayer(best.line)} (${best.entry.crewName})`;
+      return `**${RECORD_STAT_LABELS[key]}** ${best.line[key]} - ${formatPlayer(best.line)}${best.entry.opponentName ? ` vs ${best.entry.opponentName}` : ""}`;
     })
     .filter(Boolean)
     .slice(0, recordsPerMode)
@@ -215,14 +198,10 @@ function formatDetectedRecords(records: DetectedRecord[]): string {
 function formatRecent(entries: RecordEntry[]): string {
   return entries
     .map((entry) => {
-      const score = entry.crewScore !== undefined && entry.opponentScore !== undefined ? ` ${entry.crewScore}-${entry.opponentScore}` : "";
-      return `• ${entry.crewName} ${entry.result.toUpperCase()}${score} - <t:${Math.floor(new Date(entry.submittedAt).getTime() / 1000)}:R>`;
+      const holder = entry.claimedRecordHolderId ? `<@${entry.claimedRecordHolderId}>` : "Unknown holder";
+      return `- ${holder} submitted ${GAME_MODE_LABELS[entry.mode]} - <t:${Math.floor(new Date(entry.submittedAt).getTime() / 1000)}:R>`;
     })
     .join("\n");
-}
-
-function formatTotals(entry: RecordEntry): string {
-  return `${entry.totals.points} PTS | ${entry.totals.rebounds} REB | ${entry.totals.assists} AST | ${entry.totals.steals} STL | ${entry.totals.blocks} BLK | ${entry.totals.turnovers} TO`;
 }
 
 function formatPlayer(line: PlayerStatLine): string {

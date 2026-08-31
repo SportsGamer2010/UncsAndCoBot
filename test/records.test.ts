@@ -5,7 +5,7 @@ import { detectNewRecords } from "../src/records.js";
 import type { RecordEntry } from "../src/types.js";
 
 describe("detectNewRecords", () => {
-  it("detects new team and player records against prior entries", () => {
+  it("detects new player records against prior entries", () => {
     const prior = makeEntry({
       totals: { points: 82, rebounds: 21, assists: 18, steals: 5, blocks: 3, turnovers: 6 },
       stats: [{ playerName: "Old Guard", points: 32, rebounds: 2, assists: 8, steals: 1, blocks: 0, turnovers: 2 }]
@@ -17,8 +17,8 @@ describe("detectNewRecords", () => {
 
     const records = detectNewRecords([prior], current);
 
-    assert(records.some((record) => record.scope === "team" && record.statKey === "points" && record.value === 95 && record.previousValue === 82));
     assert(records.some((record) => record.scope === "player" && record.statKey === "points" && record.value === 45 && record.discordUserId === "123"));
+    assert(!records.some((record) => record.scope === "team"));
   });
 
   it("does not detect records when values do not beat prior highs", () => {

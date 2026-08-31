@@ -18,7 +18,7 @@ import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } fr
 import { buildModeEmbed, buildOverviewEmbed, buildSubmissionEmbed } from "./recordBook.js";
 import { detectNewRecords } from "./records.js";
 import { DuplicateScreenshotError, hashImage, RecordBookStore } from "./storage.js";
-import { GAME_MODE_LABELS, GAME_MODES, RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type GameResult, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
+import { GAME_MODE_LABELS, GAME_MODES, PLAYER_RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
 
 const INSTRUCTION_TOPIC =
   "Submit end-of-game NBA 2K screenshots with /submit-record. Records are saved only from screenshot-backed submissions.";
@@ -63,6 +63,10 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
       if (interaction.commandName === "submit-record") {
         await handleSubmitRecord(interaction, config, store);
       }
+
+      if (interaction.commandName === "records") {
+        await handleRecordsCommand(interaction, config, store);
+      }
     } catch (error) {
       console.error(error);
       await safeInteractionReply(interaction, friendlyError(error));
@@ -75,21 +79,13 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
 function commandPayloads() {
   const submitRecord = new SlashCommandBuilder()
     .setName("submit-record")
-    .setDescription("Submit an end-of-game screenshot to update crew records.")
+    .setDescription("Submit an end-of-game screenshot to update player records.")
     .addStringOption((option) =>
       option
         .setName("mode")
         .setDescription("Game mode for this record")
         .setRequired(true)
         .addChoices(...GAME_MODES.map((mode) => ({ name: GAME_MODE_LABELS[mode], value: mode })))
-    )
-    .addStringOption((option) => option.setName("crew").setDescription("Crew/team name").setRequired(true).setMaxLength(60))
-    .addStringOption((option) =>
-      option
-        .setName("result")
-        .setDescription("Did your crew win or lose?")
-        .setRequired(true)
-        .addChoices({ name: "Win", value: "win" }, { name: "Loss", value: "loss" })
     )
     .addStringOption((option) =>
       option
@@ -99,11 +95,20 @@ function commandPayloads() {
         .addChoices(...recordClaimChoices())
     )
     .addAttachmentOption((option) => option.setName("screenshot").setDescription("End-of-game box score screenshot").setRequired(true))
-    .addUserOption((option) => option.setName("record-holder").setDescription("Discord member who set the record, if this is a player record").setRequired(false))
+    .addUserOption((option) => option.setName("record-holder").setDescription("Discord member who set the record").setRequired(true))
     .addStringOption((option) => option.setName("opponent").setDescription("Opponent crew/team name").setRequired(false).setMaxLength(60))
-    .addIntegerOption((option) => option.setName("crew-score").setDescription("Your crew final score").setRequired(false).setMinValue(0).setMaxValue(300))
-    .addIntegerOption((option) => option.setName("opponent-score").setDescription("Opponent final score").setRequired(false).setMinValue(0).setMaxValue(300))
     .addStringOption((option) => option.setName("notes").setDescription("Optional context for staff").setRequired(false).setMaxLength(240));
+
+  const records = new SlashCommandBuilder()
+    .setName("records")
+    .setDescription("View saved player records.")
+    .addStringOption((option) =>
+      option
+        .setName("mode")
+        .setDescription("Game mode to view")
+        .setRequired(false)
+        .addChoices(...GAME_MODES.map((mode) => ({ name: GAME_MODE_LABELS[mode], value: mode })))
+    );
 
   const recordBook = new SlashCommandBuilder()
     .setName("recordbook")
@@ -112,11 +117,11 @@ function commandPayloads() {
     .addSubcommand((subcommand) => subcommand.setName("setup").setDescription("Create or refresh the Statistics > record-book channel."))
     .addSubcommand((subcommand) => subcommand.setName("refresh").setDescription("Refresh record-book embeds from saved submissions."));
 
-  return [submitRecord.toJSON(), recordBook.toJSON()];
+  return [submitRecord.toJSON(), records.toJSON(), recordBook.toJSON()];
 }
 
 function recordClaimChoices(): { name: string; value: RecordClaim }[] {
-  const statChoices = RECORD_CLAIMS.filter((claim) => claim !== "not_sure").map((claim) => {
+  const statChoices = PLAYER_RECORD_CLAIMS.filter((claim) => claim !== "not_sure").map((claim) => {
     const [scope, statKey] = claim.split("_") as [RecordScope, keyof typeof RECORD_STAT_LABELS];
     return {
       name: `${scope === "team" ? "Team" : "Player"} ${RECORD_STAT_LABELS[statKey]}`,
@@ -191,13 +196,9 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   }
 
   const mode = interaction.options.getString("mode", true) as GameMode;
-  const result = interaction.options.getString("result", true) as GameResult;
   const claimedRecord = interaction.options.getString("claimed-record", true) as RecordClaim;
-  const claimedRecordHolder = interaction.options.getUser("record-holder");
-  const crewName = interaction.options.getString("crew", true);
+  const claimedRecordHolder = interaction.options.getUser("record-holder", true);
   const opponentName = interaction.options.getString("opponent") ?? undefined;
-  const crewScore = interaction.options.getInteger("crew-score") ?? undefined;
-  const opponentScore = interaction.options.getInteger("opponent-score") ?? undefined;
   const notes = interaction.options.getString("notes") ?? undefined;
   const channel = await ensureRecordBookChannel(interaction.guild, config);
   const playerLines = await attachDiscordMembers(interaction.guild, parsed.playerLines, claimedRecordHolder);
@@ -213,11 +214,7 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
     submittedByTag: interaction.user.tag,
     submittedAt: new Date().toISOString(),
     mode,
-    crewName,
     opponentName,
-    result,
-    crewScore,
-    opponentScore,
     notes,
     claimedRecord,
     claimedRecordHolderId: claimedRecordHolder?.id,
@@ -240,7 +237,22 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   await channel.send({ embeds: [buildSubmissionEmbed(entry)] });
   await publishRecordBook(interaction.guild, channel, config, store);
 
-  await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} submission for ${crewName}. The record book has been refreshed in ${channel}.`);
+  await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} player-record submission for ${claimedRecordHolder}. The record book has been refreshed in ${channel}.`);
+}
+
+async function handleRecordsCommand(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
+  if (!interaction.guild) {
+    await interaction.reply({ content: "Records can only be viewed inside a server.", ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+  const data = await store.read();
+  const guildEntries = data.entries.filter((entry) => entry.guildId === interaction.guild?.id);
+  const mode = interaction.options.getString("mode") as GameMode | null;
+  const embeds = mode ? [buildModeEmbed(mode, guildEntries, config.RECORDS_PER_MODE)] : GAME_MODES.map((gameMode) => buildModeEmbed(gameMode, guildEntries, config.RECORDS_PER_MODE));
+
+  await interaction.editReply({ embeds });
 }
 
 async function ensureRecordBookChannel(guild: Guild, config: AppConfig): Promise<TextChannel> {
@@ -316,7 +328,8 @@ async function safeInteractionReply(interaction: ChatInputCommandInteraction, co
 
 function friendlyError(error: unknown): string {
   if (error instanceof DuplicateScreenshotError) {
-    return `That screenshot was already saved for ${error.existingEntry.crewName} on ${new Date(error.existingEntry.submittedAt).toLocaleString()}.`;
+    const holder = error.existingEntry.claimedRecordHolderTag ?? error.existingEntry.crewName ?? "another submission";
+    return `That screenshot was already saved for ${holder} on ${new Date(error.existingEntry.submittedAt).toLocaleString()}.`;
   }
 
   if (error instanceof Error) {

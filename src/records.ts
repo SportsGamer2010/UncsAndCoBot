@@ -4,24 +4,15 @@ import {
   type PlayerStatLine,
   type RecordEntry,
   type RecordScope,
-  type RecordStatKey,
-  type StatTotals
+  type RecordStatKey
 } from "./types.js";
+
+const PLAYER_RECORD_STATS: RecordStatKey[] = ["points", "rebounds", "assists", "steals", "blocks"];
 
 export function detectNewRecords(priorEntries: RecordEntry[], entry: Omit<RecordEntry, "detectedRecords">): DetectedRecord[] {
   const detected: DetectedRecord[] = [];
 
-  for (const statKey of RECORD_STAT_KEYS) {
-    const previousTeamBest = bestTeamRecord(priorEntries, statKey);
-    if (isNewRecord(entry.totals[statKey], previousTeamBest?.value)) {
-      detected.push({
-        scope: "team",
-        statKey,
-        value: entry.totals[statKey],
-        previousValue: previousTeamBest?.value
-      });
-    }
-
+  for (const statKey of PLAYER_RECORD_STATS) {
     const previousPlayerBest = bestPlayerRecord(priorEntries, statKey);
     const currentPlayerBest = bestCurrentPlayerRecord(entry.stats, statKey);
     if (currentPlayerBest && isNewRecord(currentPlayerBest[statKey], previousPlayerBest?.value)) {
@@ -59,17 +50,6 @@ export function isClaimConfirmed(entry: RecordEntry): boolean {
   }
 
   return entry.detectedRecords.some((record) => record.scope === parsedClaim.scope && record.statKey === parsedClaim.statKey);
-}
-
-function bestTeamRecord(entries: RecordEntry[], statKey: RecordStatKey): { value: number; totals: StatTotals } | undefined {
-  return entries.reduce<{ value: number; totals: StatTotals } | undefined>((best, entry) => {
-    const value = entry.totals[statKey];
-    if (!best || value > best.value) {
-      return { value, totals: entry.totals };
-    }
-
-    return best;
-  }, undefined);
 }
 
 function bestPlayerRecord(entries: RecordEntry[], statKey: RecordStatKey): { value: number; line: PlayerStatLine } | undefined {
