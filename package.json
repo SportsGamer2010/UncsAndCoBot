@@ -1,0 +1,35 @@
+{
+  "name": "uncs-and-co-record-book-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for OCR-backed NBA 2K crew record tracking.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "tsx --test test/**/*.test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://origin.cursor.com/git/brian-burnett/tmp-6789572e53c68907.git"
+  },
+  "keywords": [
+    "discord",
+    "nba-2k",
+    "ocr",
+    "record-book"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.4.2",
+    "tesseract.js": "^7.0.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}
