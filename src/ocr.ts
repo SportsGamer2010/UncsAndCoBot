@@ -79,7 +79,7 @@ function parsePlayerLine(line: string): PlayerStatLine | undefined {
     return undefined;
   }
 
-  const gradeMatch = line.match(/\b([ABCDF][+-]?)\b/i);
+  const gradeMatch = line.match(/\b([ABCDF][+-]?)(?=\s|$)/i);
   const statsStart = gradeMatch?.index !== undefined ? gradeMatch.index + gradeMatch[0].length : findFirstStatIndex(line);
   if (statsStart < 0) {
     return undefined;
