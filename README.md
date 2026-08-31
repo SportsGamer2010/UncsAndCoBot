@@ -97,6 +97,19 @@ Use these settings on a bot-friendly host:
 - Recommended environment variable: `DISCORD_GUILD_ID=1539616713501310996`
 - Persistent disk/volume path: `/data`
 
+### Railway variable checklist
+
+Add these variables to the Railway service. Paste your Discord bot token only in Railway's variable field:
+
+```bash
+DISCORD_TOKEN=
+DISCORD_GUILD_ID=1539616713501310996
+DATA_DIR=/data
+NODE_ENV=production
+```
+
+Railway should use `railway.json` and the included `Dockerfile` automatically after the repository is connected.
+
 ## Server workflow
 
 1. A staff member runs `/recordbook setup`.
