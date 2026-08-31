@@ -24,6 +24,14 @@ export function getConfig(): AppConfig {
   const parsed = envSchema.parse(process.env);
   return {
     ...parsed,
-    DATA_DIR: parsed.DATA_DIR || defaultDataDir
+    DATA_DIR: normalizeDataDir(parsed.DATA_DIR)
   };
+}
+
+function normalizeDataDir(dataDir: string): string {
+  if (process.env.NODE_ENV === "production" && !path.isAbsolute(dataDir)) {
+    return "/data";
+  }
+
+  return dataDir || defaultDataDir;
 }

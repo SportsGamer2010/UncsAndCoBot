@@ -17,6 +17,7 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Links the submitted player record to a Discord member
 - Extracts stat rows from the screenshot with local Tesseract OCR
 - Compares OCR stats against saved mode records and flags newly broken records
+- Posts a group-visible notification when a new player record is set
 - Awards mode/stat record-holder roles for verified individual records when Discord member matching succeeds
 - Saves every valid record to `data/record-book.json`
 - Prevents duplicate screenshot submissions by image hash
@@ -114,6 +115,8 @@ NODE_ENV=production
 ```
 
 Railway should use `railway.json` and the included `Dockerfile` automatically after the repository is connected.
+
+In production, relative `DATA_DIR` values are forced to `/data` so Railway does not try to write inside the read-only app directory.
 
 ## Server workflow
 

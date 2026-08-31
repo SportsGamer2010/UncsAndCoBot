@@ -75,6 +75,15 @@ export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
     .setTimestamp(new Date(entry.submittedAt));
 }
 
+export function buildRecordAnnouncementEmbed(entry: RecordEntry): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(0xf0b429)
+    .setTitle(`New ${GAME_MODE_LABELS[entry.mode]} Player Record`)
+    .setDescription(formatDetectedRecords(entry.detectedRecords))
+    .setFooter({ text: "Verified from an end-of-game screenshot" })
+    .setTimestamp(new Date(entry.submittedAt));
+}
+
 function buildModeFields(entries: RecordEntry[], recordsPerMode: number): APIEmbedField[] {
   if (entries.length === 0) {
     return [
