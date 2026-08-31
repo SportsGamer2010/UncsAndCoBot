@@ -31,7 +31,19 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
     }
 
     console.log(`Logged in as ${client.user.tag}`);
-    await registerCommands(client, config);
+    await registerCommands(client, config).catch((error) => {
+      console.error("Failed to register slash commands on startup:", error);
+    });
+  });
+
+  client.on("guildCreate", async (guild) => {
+    if (config.DISCORD_GUILD_ID && guild.id !== config.DISCORD_GUILD_ID) {
+      return;
+    }
+
+    await registerGuildCommands(guild, commandPayloads()).catch((error) => {
+      console.error(`Failed to register slash commands after joining ${guild.name}:`, error);
+    });
   });
 
   client.on("interactionCreate", async (interaction) => {
@@ -100,13 +112,17 @@ async function registerCommands(client: Client, config: AppConfig): Promise<void
 
   if (config.DISCORD_GUILD_ID) {
     const guild = await client.guilds.fetch(config.DISCORD_GUILD_ID);
-    await guild.commands.set(commands);
-    console.log(`Registered commands for ${guild.name}`);
+    await registerGuildCommands(guild, commands);
     return;
   }
 
-  await Promise.all(client.guilds.cache.map((guild) => guild.commands.set(commands)));
+  await Promise.all(client.guilds.cache.map((guild) => registerGuildCommands(guild, commands)));
   console.log(`Registered commands for ${client.guilds.cache.size} guild(s)`);
+}
+
+async function registerGuildCommands(guild: Guild, commands: ReturnType<typeof commandPayloads>): Promise<void> {
+  await guild.commands.set(commands);
+  console.log(`Registered commands for ${guild.name} (${guild.id})`);
 }
 
 async function handleRecordBookCommand(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
