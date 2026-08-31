@@ -1,17 +1,10 @@
 import { EmbedBuilder, type APIEmbedField } from "discord.js";
-import { GAME_MODE_LABELS, GAME_MODES, type GameMode, type RecordEntry } from "./types.js";
+import { GAME_MODE_LABELS, GAME_MODES, RECORD_STAT_LABELS, type DetectedRecord, type GameMode, type PlayerStatLine, type RecordEntry, type RecordStatKey } from "./types.js";
+import { isClaimConfirmed, parseClaimScope } from "./records.js";
 
 const BRAND_COLOR = 0x1f6feb;
 
-type StatKey = "points" | "rebounds" | "assists" | "steals" | "blocks";
-
-const STAT_LABELS: Record<StatKey, string> = {
-  points: "PTS",
-  rebounds: "REB",
-  assists: "AST",
-  steals: "STL",
-  blocks: "BLK"
-};
+const DISPLAY_RECORD_STATS: RecordStatKey[] = ["points", "rebounds", "assists", "steals", "blocks"];
 
 export function buildOverviewEmbed(channelName: string): EmbedBuilder {
   return new EmbedBuilder()
@@ -24,15 +17,15 @@ export function buildOverviewEmbed(channelName: string): EmbedBuilder {
         "**How records are recorded:**",
         "1. Play your game.",
         "2. Capture the end-of-game box score screenshot.",
-        "3. Run `/submit-record` in this channel and attach the screenshot.",
+        "3. Run `/submit-record`, choose the record you believe was set, and attach the screenshot.",
         "",
-        "Only screenshot-backed submissions are saved to the record book."
+        "Only screenshot-backed submissions are saved to the record book. The bot also checks the OCR stats against saved records and flags new records automatically."
       ].join("\n")
     )
     .addFields(
       {
         name: "Required with every submission",
-        value: "`mode`, `crew`, `result`, and a screenshot attachment."
+        value: "`mode`, `crew`, `result`, `claimed-record`, and a screenshot attachment."
       },
       {
         name: "Recommended",
@@ -78,8 +71,16 @@ export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
         value: formatTotals(entry)
       },
       {
+        name: "Claimed Record",
+        value: formatClaimedRecord(entry)
+      },
+      {
+        name: "New Records Detected",
+        value: formatDetectedRecords(entry.detectedRecords)
+      },
+      {
         name: "Players Found",
-        value: entry.stats.length > 0 ? entry.stats.map((line) => `${line.playerName}: ${line.points} PTS, ${line.rebounds} REB, ${line.assists} AST`).join("\n").slice(0, 1024) : "No player rows parsed."
+        value: entry.stats.length > 0 ? entry.stats.map((line) => `${formatPlayer(line)}: ${line.points} PTS, ${line.rebounds} REB, ${line.assists} AST`).join("\n").slice(0, 1024) : "No player rows parsed."
       }
     )
     .setImage(entry.screenshotUrl)
@@ -107,6 +108,11 @@ function buildModeFields(entries: RecordEntry[], recordsPerMode: number): APIEmb
     {
       name: "Single-Game Team Records",
       value: formatSingleGameRecords(entries, recordsPerMode),
+      inline: false
+    },
+    {
+      name: "Individual Single-Game Records",
+      value: formatIndividualRecords(entries, recordsPerMode),
       inline: false
     },
     {
@@ -140,18 +146,70 @@ function formatCrewStandings(entries: RecordEntry[]): string {
 }
 
 function formatSingleGameRecords(entries: RecordEntry[], recordsPerMode: number): string {
-  return (Object.keys(STAT_LABELS) as StatKey[])
+  return DISPLAY_RECORD_STATS
     .map((key) => {
       const best = [...entries].sort((a, b) => b.totals[key] - a.totals[key])[0];
       if (!best) {
         return undefined;
       }
 
-      return `**${STAT_LABELS[key]}** ${best.totals[key]} - ${best.crewName}${best.opponentName ? ` vs ${best.opponentName}` : ""}`;
+      return `**${RECORD_STAT_LABELS[key]}** ${best.totals[key]} - ${best.crewName}${best.opponentName ? ` vs ${best.opponentName}` : ""}`;
     })
     .filter(Boolean)
     .slice(0, recordsPerMode)
     .join("\n");
+}
+
+function formatIndividualRecords(entries: RecordEntry[], recordsPerMode: number): string {
+  return DISPLAY_RECORD_STATS
+    .map((key) => {
+      const best = entries.reduce<{ entry: RecordEntry; line: PlayerStatLine } | undefined>((currentBest, entry) => {
+        for (const line of entry.stats) {
+          if (!currentBest || line[key] > currentBest.line[key]) {
+            currentBest = { entry, line };
+          }
+        }
+
+        return currentBest;
+      }, undefined);
+
+      if (!best) {
+        return undefined;
+      }
+
+      return `**${RECORD_STAT_LABELS[key]}** ${best.line[key]} - ${formatPlayer(best.line)} (${best.entry.crewName})`;
+    })
+    .filter(Boolean)
+    .slice(0, recordsPerMode)
+    .join("\n");
+}
+
+function formatClaimedRecord(entry: RecordEntry): string {
+  if (entry.claimedRecord === "not_sure") {
+    return `Submitted as **Not sure - bot check**. ${entry.detectedRecords.length > 0 ? "New record detected." : "No new mode record detected."}`;
+  }
+
+  const parsed = parseClaimScope(entry.claimedRecord);
+  const label = parsed ? `${parsed.scope === "team" ? "Team" : "Player"} ${RECORD_STAT_LABELS[parsed.statKey]}` : entry.claimedRecord;
+  const holder = entry.claimedRecordHolderId ? ` by <@${entry.claimedRecordHolderId}>` : "";
+  const status = isClaimConfirmed(entry) ? "confirmed by OCR" : "not confirmed as a new saved record";
+
+  return `**${label}**${holder} - ${status}.`;
+}
+
+function formatDetectedRecords(records: DetectedRecord[]): string {
+  if (records.length === 0) {
+    return "No new all-time mode record was detected from this screenshot.";
+  }
+
+  return records
+    .map((record) => {
+      const holder = record.scope === "player" ? ` - ${record.discordUserId ? `<@${record.discordUserId}>` : record.discordDisplayName ?? record.playerName ?? "Unknown player"}` : "";
+      const previous = record.previousValue === undefined ? "first saved mark" : `previous ${record.previousValue}`;
+      return `NEW **${record.scope === "team" ? "Team" : "Player"} ${RECORD_STAT_LABELS[record.statKey]}** ${record.value}${holder} (${previous})`;
+    })
+    .join("\n")
+    .slice(0, 1024);
 }
 
 function formatRecent(entries: RecordEntry[]): string {
@@ -165,6 +223,14 @@ function formatRecent(entries: RecordEntry[]): string {
 
 function formatTotals(entry: RecordEntry): string {
   return `${entry.totals.points} PTS | ${entry.totals.rebounds} REB | ${entry.totals.assists} AST | ${entry.totals.steals} STL | ${entry.totals.blocks} BLK | ${entry.totals.turnovers} TO`;
+}
+
+function formatPlayer(line: PlayerStatLine): string {
+  if (line.discordUserId) {
+    return `<@${line.discordUserId}>`;
+  }
+
+  return line.discordDisplayName ?? line.playerName;
 }
 
 function pointDiff(row: { pointsFor: number; pointsAgainst: number }): number {

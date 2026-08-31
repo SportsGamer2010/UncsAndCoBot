@@ -2,10 +2,12 @@ import crypto from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { GAME_MODES, type GameMode, type PublishedRecordBook, type RecordBookData, type RecordEntry } from "./types.js";
+import { GAME_MODES, RECORD_CLAIMS, RECORD_STAT_KEYS, type GameMode, type PublishedRecordBook, type RecordBookData, type RecordEntry } from "./types.js";
 
 const playerStatLineSchema = z.object({
   playerName: z.string(),
+  discordUserId: z.string().optional(),
+  discordDisplayName: z.string().optional(),
   teammateGrade: z.string().optional(),
   points: z.number(),
   rebounds: z.number(),
@@ -13,6 +15,25 @@ const playerStatLineSchema = z.object({
   steals: z.number(),
   blocks: z.number(),
   turnovers: z.number()
+});
+
+const statTotalsSchema = z.object({
+  points: z.number(),
+  rebounds: z.number(),
+  assists: z.number(),
+  steals: z.number(),
+  blocks: z.number(),
+  turnovers: z.number()
+});
+
+const detectedRecordSchema = z.object({
+  scope: z.enum(["player", "team"]),
+  statKey: z.enum(RECORD_STAT_KEYS),
+  value: z.number(),
+  previousValue: z.number().optional(),
+  playerName: z.string().optional(),
+  discordUserId: z.string().optional(),
+  discordDisplayName: z.string().optional()
 });
 
 const recordEntrySchema = z.object({
@@ -30,10 +51,14 @@ const recordEntrySchema = z.object({
   crewScore: z.number().optional(),
   opponentScore: z.number().optional(),
   notes: z.string().optional(),
+  claimedRecord: z.enum(RECORD_CLAIMS).default("not_sure"),
+  claimedRecordHolderId: z.string().optional(),
+  claimedRecordHolderTag: z.string().optional(),
   screenshotUrl: z.string(),
   screenshotHash: z.string(),
   stats: z.array(playerStatLineSchema),
-  totals: playerStatLineSchema.omit({ playerName: true, teammateGrade: true }),
+  totals: statTotalsSchema,
+  detectedRecords: z.array(detectedRecordSchema).default([]),
   ocrText: z.string()
 });
 

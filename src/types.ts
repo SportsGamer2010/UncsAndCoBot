@@ -10,8 +10,43 @@ export const GAME_MODE_LABELS: Record<GameMode, string> = {
 
 export type GameResult = "win" | "loss";
 
+export const RECORD_STAT_KEYS = ["points", "rebounds", "assists", "steals", "blocks", "turnovers"] as const;
+
+export type RecordStatKey = (typeof RECORD_STAT_KEYS)[number];
+
+export const RECORD_STAT_LABELS: Record<RecordStatKey, string> = {
+  points: "PTS",
+  rebounds: "REB",
+  assists: "AST",
+  steals: "STL",
+  blocks: "BLK",
+  turnovers: "TO"
+};
+
+export const RECORD_CLAIMS = [
+  "player_points",
+  "player_rebounds",
+  "player_assists",
+  "player_steals",
+  "player_blocks",
+  "player_turnovers",
+  "team_points",
+  "team_rebounds",
+  "team_assists",
+  "team_steals",
+  "team_blocks",
+  "team_turnovers",
+  "not_sure"
+] as const;
+
+export type RecordClaim = (typeof RECORD_CLAIMS)[number];
+
+export type RecordScope = "player" | "team";
+
 export interface PlayerStatLine {
   playerName: string;
+  discordUserId?: string;
+  discordDisplayName?: string;
   teammateGrade?: string;
   points: number;
   rebounds: number;
@@ -21,10 +56,22 @@ export interface PlayerStatLine {
   turnovers: number;
 }
 
+export type StatTotals = Record<RecordStatKey, number>;
+
 export interface ParsedStats {
   playerLines: PlayerStatLine[];
   rawText: string;
   confidence?: number;
+}
+
+export interface DetectedRecord {
+  scope: RecordScope;
+  statKey: RecordStatKey;
+  value: number;
+  previousValue?: number;
+  playerName?: string;
+  discordUserId?: string;
+  discordDisplayName?: string;
 }
 
 export interface RecordEntry {
@@ -42,10 +89,14 @@ export interface RecordEntry {
   crewScore?: number;
   opponentScore?: number;
   notes?: string;
+  claimedRecord: RecordClaim;
+  claimedRecordHolderId?: string;
+  claimedRecordHolderTag?: string;
   screenshotUrl: string;
   screenshotHash: string;
   stats: PlayerStatLine[];
-  totals: Omit<PlayerStatLine, "playerName" | "teammateGrade">;
+  totals: StatTotals;
+  detectedRecords: DetectedRecord[];
   ocrText: string;
 }
 

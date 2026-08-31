@@ -12,10 +12,12 @@ import {
   TextChannel
 } from "discord.js";
 import type { AppConfig } from "./config.js";
+import { attachDiscordMembers } from "./members.js";
 import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } from "./ocr.js";
 import { buildModeEmbed, buildOverviewEmbed, buildSubmissionEmbed } from "./recordBook.js";
+import { detectNewRecords } from "./records.js";
 import { DuplicateScreenshotError, hashImage, RecordBookStore } from "./storage.js";
-import { GAME_MODE_LABELS, GAME_MODES, type GameMode, type GameResult, type PublishedRecordBook, type RecordEntry } from "./types.js";
+import { GAME_MODE_LABELS, GAME_MODES, RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type GameResult, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
 
 const INSTRUCTION_TOPIC =
   "Submit end-of-game NBA 2K screenshots with /submit-record. Records are saved only from screenshot-backed submissions.";
@@ -88,7 +90,15 @@ function commandPayloads() {
         .setRequired(true)
         .addChoices({ name: "Win", value: "win" }, { name: "Loss", value: "loss" })
     )
+    .addStringOption((option) =>
+      option
+        .setName("claimed-record")
+        .setDescription("Which record do you believe was set?")
+        .setRequired(true)
+        .addChoices(...recordClaimChoices())
+    )
     .addAttachmentOption((option) => option.setName("screenshot").setDescription("End-of-game box score screenshot").setRequired(true))
+    .addUserOption((option) => option.setName("record-holder").setDescription("Discord member who set the record, if this is a player record").setRequired(false))
     .addStringOption((option) => option.setName("opponent").setDescription("Opponent crew/team name").setRequired(false).setMaxLength(60))
     .addIntegerOption((option) => option.setName("crew-score").setDescription("Your crew final score").setRequired(false).setMinValue(0).setMaxValue(300))
     .addIntegerOption((option) => option.setName("opponent-score").setDescription("Opponent final score").setRequired(false).setMinValue(0).setMaxValue(300))
@@ -102,6 +112,18 @@ function commandPayloads() {
     .addSubcommand((subcommand) => subcommand.setName("refresh").setDescription("Refresh record-book embeds from saved submissions."));
 
   return [submitRecord.toJSON(), recordBook.toJSON()];
+}
+
+function recordClaimChoices(): { name: string; value: RecordClaim }[] {
+  const statChoices = RECORD_CLAIMS.filter((claim) => claim !== "not_sure").map((claim) => {
+    const [scope, statKey] = claim.split("_") as [RecordScope, keyof typeof RECORD_STAT_LABELS];
+    return {
+      name: `${scope === "team" ? "Team" : "Player"} ${RECORD_STAT_LABELS[statKey]}`,
+      value: claim
+    };
+  });
+
+  return [...statChoices, { name: "Not sure - let the bot check", value: "not_sure" }];
 }
 
 async function registerCommands(client: Client, config: AppConfig): Promise<void> {
@@ -169,16 +191,20 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
 
   const mode = interaction.options.getString("mode", true) as GameMode;
   const result = interaction.options.getString("result", true) as GameResult;
+  const claimedRecord = interaction.options.getString("claimed-record", true) as RecordClaim;
+  const claimedRecordHolder = interaction.options.getUser("record-holder");
   const crewName = interaction.options.getString("crew", true);
   const opponentName = interaction.options.getString("opponent") ?? undefined;
   const crewScore = interaction.options.getInteger("crew-score") ?? undefined;
   const opponentScore = interaction.options.getInteger("opponent-score") ?? undefined;
   const notes = interaction.options.getString("notes") ?? undefined;
   const channel = await ensureRecordBookChannel(interaction.guild, config);
-  const teamTotals = totalStats(parsed.playerLines);
+  const playerLines = await attachDiscordMembers(interaction.guild, parsed.playerLines, claimedRecordHolder);
+  const teamTotals = totalStats(playerLines);
   const { playerName: _playerName, teammateGrade: _teammateGrade, ...totals } = teamTotals;
+  const priorModeEntries = await store.entriesForMode(interaction.guild.id, mode);
 
-  const entry: RecordEntry = {
+  const entryBase: Omit<RecordEntry, "detectedRecords"> = {
     id: crypto.randomUUID(),
     guildId: interaction.guild.id,
     channelId: channel.id,
@@ -192,11 +218,18 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
     crewScore,
     opponentScore,
     notes,
+    claimedRecord,
+    claimedRecordHolderId: claimedRecordHolder?.id,
+    claimedRecordHolderTag: claimedRecordHolder?.tag,
     screenshotUrl: attachment.url,
     screenshotHash: hashImage(image),
-    stats: parsed.playerLines,
+    stats: playerLines,
     totals,
     ocrText: parsed.rawText
+  };
+  const entry: RecordEntry = {
+    ...entryBase,
+    detectedRecords: detectNewRecords(priorModeEntries, entryBase)
   };
 
   await store.addEntry(entry);

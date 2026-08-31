@@ -13,7 +13,10 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Creates/refreshes `Statistics` > `#record-book` with `/recordbook setup`
 - Pins a clear instruction embed explaining that screenshots are required
 - Accepts player submissions through `/submit-record`
+- Asks players which record they believe was set
+- Optionally links a claimed player record to a Discord member
 - Extracts stat rows from the screenshot with local Tesseract OCR
+- Compares OCR stats against saved mode records and flags newly broken records
 - Saves every valid record to `data/record-book.json`
 - Prevents duplicate screenshot submissions by image hash
 - Tracks crew win/loss records by mode
@@ -118,9 +121,11 @@ Railway should use `railway.json` and the included `Dockerfile` automatically af
    - `mode`: Rec, Pro-Am, or Theater
    - `crew`: their crew name
    - `result`: win or loss
+   - `claimed-record`: the record they believe was set, or "Not sure"
    - `screenshot`: end-of-game box score image
+   - optional `record-holder`: Discord member who set an individual record
    - optional opponent/final score/notes
-4. The bot reads the screenshot, saves the result, posts a confirmation embed, and refreshes the record book.
+4. The bot reads the screenshot, matches OCR player names to Discord members when possible, checks for new team/player records, saves the result, posts a confirmation embed, and refreshes the record book.
 
 ## Persistence
 
