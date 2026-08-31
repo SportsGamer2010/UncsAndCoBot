@@ -11,6 +11,7 @@ import {
   SlashCommandBuilder,
   TextChannel
 } from "discord.js";
+import { syncAchievementRoles } from "./achievements.js";
 import type { AppConfig } from "./config.js";
 import { attachDiscordMembers } from "./members.js";
 import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } from "./ocr.js";
@@ -233,6 +234,9 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   };
 
   await store.addEntry(entry);
+  await syncAchievementRoles(interaction.guild, entry).catch((error) => {
+    console.error("Failed to sync achievement roles:", error);
+  });
   await channel.send({ embeds: [buildSubmissionEmbed(entry)] });
   await publishRecordBook(interaction.guild, channel, config, store);
 

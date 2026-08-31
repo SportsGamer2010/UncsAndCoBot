@@ -30,6 +30,9 @@ export function detectNewRecords(priorEntries: RecordEntry[], entry: Omit<Record
         statKey,
         value: currentPlayerBest[statKey],
         previousValue: previousPlayerBest?.value,
+        previousPlayerName: previousPlayerBest?.line.playerName,
+        previousDiscordUserId: previousPlayerBest?.line.discordUserId,
+        previousDiscordDisplayName: previousPlayerBest?.line.discordDisplayName,
         playerName: currentPlayerBest.playerName,
         discordUserId: currentPlayerBest.discordUserId,
         discordDisplayName: currentPlayerBest.discordDisplayName

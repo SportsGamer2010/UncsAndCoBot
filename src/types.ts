@@ -69,6 +69,9 @@ export interface DetectedRecord {
   statKey: RecordStatKey;
   value: number;
   previousValue?: number;
+  previousPlayerName?: string;
+  previousDiscordUserId?: string;
+  previousDiscordDisplayName?: string;
   playerName?: string;
   discordUserId?: string;
   discordDisplayName?: string;

@@ -31,6 +31,9 @@ const detectedRecordSchema = z.object({
   statKey: z.enum(RECORD_STAT_KEYS),
   value: z.number(),
   previousValue: z.number().optional(),
+  previousPlayerName: z.string().optional(),
+  previousDiscordUserId: z.string().optional(),
+  previousDiscordDisplayName: z.string().optional(),
   playerName: z.string().optional(),
   discordUserId: z.string().optional(),
   discordDisplayName: z.string().optional()

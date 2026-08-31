@@ -1,4 +1,5 @@
 import Tesseract from "tesseract.js";
+import sharp from "sharp";
 import type { ParsedStats, PlayerStatLine } from "./types.js";
 
 const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
@@ -29,11 +30,18 @@ export async function downloadImage(url: string, maxBytes: number): Promise<Buff
 }
 
 export async function extractStatsFromImage(image: Buffer, language: string): Promise<ParsedStats> {
-  const result = await Tesseract.recognize(image, language, {
-    logger: () => undefined
-  });
+  const variants = await buildOcrVariants(image);
+  const results = [];
 
-  return parseStatsText(result.data.text, result.data.confidence);
+  for (const variant of variants) {
+    const result = await Tesseract.recognize(variant.image, language, {
+      logger: () => undefined
+    });
+    results.push({ ...result.data, variant: variant.name });
+  }
+
+  const combinedText = results.map((result) => `--- ${result.variant} ---\n${result.text}`).join("\n");
+  return parseStatsText(combinedText, Math.max(...results.map((result) => result.confidence)));
 }
 
 export function parseStatsText(rawText: string, confidence?: number): ParsedStats {
@@ -128,16 +136,31 @@ function cleanPlayerName(name: string): string {
   return name
     .replace(/[|()[\]{}]/g, "")
     .replace(/\s+/g, " ")
-    .replace(/^[^A-Za-z0-9_@.-]+/, "")
+    .replace(/^[^A-Za-z0-9_.-]+/, "")
     .replace(/[^A-Za-z0-9_@ .'-]+$/, "")
     .trim();
 }
 
 function normalizeOcrDigits(text: string): string {
   return text
+    .replace(/\[[A-Za-z0-9]\]/g, " 0 ")
     .replace(/[Oo](?=\d|\s|$)/g, "0")
     .replace(/[Il](?=\d|\s|$)/g, "1")
     .replace(/[Ss](?=\d|\s|$)/g, "5");
+}
+
+async function buildOcrVariants(image: Buffer): Promise<{ name: string; image: Buffer }[]> {
+  return [
+    { name: "original", image },
+    {
+      name: "highlight-threshold",
+      image: await sharp(image).grayscale().normalize().threshold(150).png().toBuffer()
+    },
+    {
+      name: "resized-gray",
+      image: await sharp(image).resize({ width: 1800, withoutEnlargement: true }).grayscale().normalize().sharpen().png().toBuffer()
+    }
+  ];
 }
 
 function inferTurnovers(numbers: number[]): number {

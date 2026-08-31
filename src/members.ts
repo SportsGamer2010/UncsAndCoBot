@@ -76,6 +76,13 @@ function compareNames(left: string, right: string): number {
     return 0.85;
   }
 
+  const compactLeft = left.replace(/\s+/g, "");
+  const compactRight = right.replace(/\s+/g, "");
+  const distanceScore = 1 - levenshteinDistance(compactLeft, compactRight) / Math.max(compactLeft.length, compactRight.length, 1);
+  if (distanceScore >= 0.72) {
+    return distanceScore;
+  }
+
   const leftTokens = new Set(left.split(" ").filter(Boolean));
   const rightTokens = new Set(right.split(" ").filter(Boolean));
   const overlap = [...leftTokens].filter((token) => rightTokens.has(token)).length;
@@ -95,7 +102,29 @@ function searchQuery(name: string): string {
 function normalize(name: string): string {
   return name
     .toLowerCase()
+    .replace(/0/g, "o")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function levenshteinDistance(left: string, right: string): number {
+  const dp = Array.from({ length: left.length + 1 }, () => new Array<number>(right.length + 1).fill(0));
+
+  for (let i = 0; i <= left.length; i += 1) {
+    dp[i][0] = i;
+  }
+
+  for (let j = 0; j <= right.length; j += 1) {
+    dp[0][j] = j;
+  }
+
+  for (let i = 1; i <= left.length; i += 1) {
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+
+  return dp[left.length][right.length];
 }

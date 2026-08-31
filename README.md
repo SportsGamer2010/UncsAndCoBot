@@ -17,6 +17,7 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Optionally links a claimed player record to a Discord member
 - Extracts stat rows from the screenshot with local Tesseract OCR
 - Compares OCR stats against saved mode records and flags newly broken records
+- Awards mode/stat record-holder roles for verified individual records when Discord member matching succeeds
 - Saves every valid record to `data/record-book.json`
 - Prevents duplicate screenshot submissions by image hash
 - Tracks crew win/loss records by mode
@@ -32,6 +33,7 @@ Create a Discord application/bot in the Discord Developer Portal and enable thes
 - `Read Message History`
 - `Manage Channels`
 - `Manage Messages` (recommended so the bot can pin the instruction message)
+- `Manage Roles` (recommended so the bot can award record-holder roles)
 - Server Members intent is not required
 - Message Content intent is not required
 
@@ -126,6 +128,8 @@ Railway should use `railway.json` and the included `Dockerfile` automatically af
    - optional `record-holder`: Discord member who set an individual record
    - optional opponent/final score/notes
 4. The bot reads the screenshot, matches OCR player names to Discord members when possible, checks for new team/player records, saves the result, posts a confirmation embed, and refreshes the record book.
+
+When a Discord member is matched to a verified individual record, the bot creates/assigns a role such as `Rec BLK Record Holder`. The bot's server role must be higher than those record-holder roles for assignment to work.
 
 ## Persistence
 

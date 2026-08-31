@@ -45,4 +45,15 @@ Big Boardz        B+  12  18  3   0   4   3   1  5   7   0   0
     assert.equal(totals.blocks, 1);
     assert.equal(totals.turnovers, 3);
   });
+
+  it("handles highlighted-row OCR artifacts from NBA 2K screenshots", () => {
+    const parsed = parseStatsText(". @ 0GSoortsGamer A [J] 17 1 0 7 1 2 01 0 00 4");
+
+    assert.equal(parsed.playerLines.length, 1);
+    assert.equal(parsed.playerLines[0]?.points, 0);
+    assert.equal(parsed.playerLines[0]?.rebounds, 17);
+    assert.equal(parsed.playerLines[0]?.assists, 1);
+    assert.equal(parsed.playerLines[0]?.blocks, 7);
+    assert.equal(parsed.playerLines[0]?.turnovers, 2);
+  });
 });
