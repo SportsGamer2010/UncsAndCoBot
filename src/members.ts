@@ -12,13 +12,8 @@ export async function attachDiscordMembers(guild: Guild, lines: PlayerStatLine[]
       }
 
       try {
-        const query = searchQuery(line.playerName);
-        if (!query) {
-          return line;
-        }
-
-        const candidates = await guild.members.search({ query, limit: 5 });
-        const best = [...candidates.values()]
+        const candidates = await searchMemberCandidates(guild, line.playerName);
+        const best = candidates
           .map((member) => ({ member, score: memberScore(line.playerName, member) }))
           .sort((a, b) => b.score - a.score)[0];
 
@@ -33,6 +28,21 @@ export async function attachDiscordMembers(guild: Guild, lines: PlayerStatLine[]
       }
     })
   );
+}
+
+async function searchMemberCandidates(guild: Guild, playerName: string): Promise<GuildMember[]> {
+  const candidates = new Map<string, GuildMember>();
+
+  for (const query of searchQueries(playerName)) {
+    const results = await guild.members.search({ query, limit: 10 });
+    for (const member of results.values()) {
+      if (!member.user.bot) {
+        candidates.set(member.id, member);
+      }
+    }
+  }
+
+  return [...candidates.values()];
 }
 
 async function matchClaimedHolder(guild: Guild, line: PlayerStatLine, claimedHolder?: User | null): Promise<GuildMember | undefined> {
@@ -91,12 +101,22 @@ function compareNames(left: string, right: string): number {
   return overlap / largest;
 }
 
-function searchQuery(name: string): string {
-  return name
+function searchQueries(name: string): string[] {
+  const cleaned = name
     .replace(/[^A-Za-z0-9_ .'-]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 32);
+
+  const zeroAsLetter = cleaned.replace(/0/g, "O");
+  const spacedCamelCase = zeroAsLetter.replace(/([a-z])([A-Z])/g, "$1 $2");
+  const fragments = spacedCamelCase
+    .split(/\s+/)
+    .map((part) => part.replace(/[^A-Za-z0-9_'-]/g, ""))
+    .filter((part) => part.length >= 4)
+    .sort((a, b) => b.length - a.length);
+
+  return [...new Set([cleaned, zeroAsLetter, ...fragments])].filter(Boolean).slice(0, 6);
 }
 
 function normalize(name: string): string {
