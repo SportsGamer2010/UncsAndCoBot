@@ -31,6 +31,7 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
     }
 
     console.log(`Logged in as ${client.user.tag}`);
+    console.log(`Bot is currently in ${client.guilds.cache.size} guild(s): ${client.guilds.cache.map((guild) => `${guild.name} (${guild.id})`).join(", ") || "none"}`);
     await registerCommands(client, config).catch((error) => {
       console.error("Failed to register slash commands on startup:", error);
     });
@@ -111,18 +112,31 @@ async function registerCommands(client: Client, config: AppConfig): Promise<void
   const commands = commandPayloads();
 
   if (config.DISCORD_GUILD_ID) {
+    console.log(`Registering guild slash commands for configured guild ${config.DISCORD_GUILD_ID}`);
     const guild = await client.guilds.fetch(config.DISCORD_GUILD_ID);
     await registerGuildCommands(guild, commands);
+    await registerGlobalCommands(client, commands);
     return;
   }
 
   await Promise.all(client.guilds.cache.map((guild) => registerGuildCommands(guild, commands)));
+  await registerGlobalCommands(client, commands);
   console.log(`Registered commands for ${client.guilds.cache.size} guild(s)`);
 }
 
 async function registerGuildCommands(guild: Guild, commands: ReturnType<typeof commandPayloads>): Promise<void> {
   await guild.commands.set(commands);
   console.log(`Registered commands for ${guild.name} (${guild.id})`);
+}
+
+async function registerGlobalCommands(client: Client, commands: ReturnType<typeof commandPayloads>): Promise<void> {
+  if (!client.application) {
+    console.warn("Skipping global command registration because client.application is unavailable.");
+    return;
+  }
+
+  await client.application.commands.set(commands);
+  console.log("Registered global fallback slash commands. Discord can take up to one hour to show global commands.");
 }
 
 async function handleRecordBookCommand(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
