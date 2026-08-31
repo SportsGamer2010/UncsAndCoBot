@@ -106,43 +106,6 @@ function buildModeFields(entries: RecordEntry[], recordsPerMode: number): APIEmb
   ];
 }
 
-function formatCrewStandings(entries: RecordEntry[]): string {
-  const rows = new Map<string, { wins: number; losses: number; pointsFor: number; pointsAgainst: number; games: number }>();
-
-  for (const entry of entries) {
-    const current = rows.get(entry.crewName) ?? { wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, games: 0 };
-    current.games += 1;
-    current.wins += entry.result === "win" ? 1 : 0;
-    current.losses += entry.result === "loss" ? 1 : 0;
-    current.pointsFor += entry.crewScore ?? 0;
-    current.pointsAgainst += entry.opponentScore ?? 0;
-    rows.set(entry.crewName, current);
-  }
-
-  const sorted = [...rows.entries()]
-    .sort(([, a], [, b]) => b.wins - a.wins || a.losses - b.losses || pointDiff(b) - pointDiff(a))
-    .slice(0, 10);
-
-  return codeBlock(
-    ["Crew                 W-L   DIFF", ...sorted.map(([crew, row]) => `${crew.padEnd(20).slice(0, 20)} ${`${row.wins}-${row.losses}`.padEnd(5)} ${formatDiff(pointDiff(row))}`)].join("\n")
-  );
-}
-
-function formatSingleGameRecords(entries: RecordEntry[], recordsPerMode: number): string {
-  return DISPLAY_RECORD_STATS
-    .map((key) => {
-      const best = [...entries].sort((a, b) => b.totals[key] - a.totals[key])[0];
-      if (!best) {
-        return undefined;
-      }
-
-      return `**${RECORD_STAT_LABELS[key]}** ${best.totals[key]} - ${best.crewName}${best.opponentName ? ` vs ${best.opponentName}` : ""}`;
-    })
-    .filter(Boolean)
-    .slice(0, recordsPerMode)
-    .join("\n");
-}
-
 function formatIndividualRecords(entries: RecordEntry[], recordsPerMode: number): string {
   return DISPLAY_RECORD_STATS
     .map((key) => {
@@ -212,18 +175,3 @@ function formatPlayer(line: PlayerStatLine): string {
   return line.discordDisplayName ?? line.playerName;
 }
 
-function pointDiff(row: { pointsFor: number; pointsAgainst: number }): number {
-  return row.pointsFor - row.pointsAgainst;
-}
-
-function formatDiff(value: number): string {
-  if (value > 0) {
-    return `+${value}`;
-  }
-
-  return String(value);
-}
-
-function codeBlock(value: string): string {
-  return `\`\`\`\n${value.slice(0, 1000)}\n\`\`\``;
-}
