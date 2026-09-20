@@ -1,5 +1,5 @@
 import { EmbedBuilder, type APIEmbedField } from "discord.js";
-import { GAME_MODE_LABELS, GAME_MODES, RECORD_STAT_LABELS, type DetectedRecord, type GameMode, type RecordEntry, type RecordStatKey } from "./types.js";
+import { GAME_MODE_LABELS, GAME_MODES, RECORD_STAT_LABELS, type DetectedRecord, type GameMode, type PlayerStatLine, type RecordEntry, type RecordStatKey } from "./types.js";
 import { getPlayerRecordHolders, isClaimConfirmed, isTiedRecord, parseClaimScope } from "./records.js";
 
 const BRAND_COLOR = 0x1f6feb;

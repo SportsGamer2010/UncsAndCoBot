@@ -44,12 +44,12 @@ describe("detectNewRecords", () => {
   it("detects a tie when a different player matches an existing high", () => {
     const prior = makeEntry({
       submittedAt: "2026-01-01T00:00:00.000Z",
-      totals: { points: 40, rebounds: 27, assists: 8, steals: 2, blocks: 1, turnovers: 3 },
-      stats: [{ playerName: "Board King", discordUserId: "111", discordDisplayName: "Board King", points: 12, rebounds: 27, assists: 2, steals: 1, blocks: 1, turnovers: 2 }]
+      totals: { points: 40, rebounds: 27, assists: 8, steals: 5, blocks: 4, turnovers: 3 },
+      stats: [{ playerName: "Board King", discordUserId: "111", discordDisplayName: "Board King", points: 40, rebounds: 27, assists: 8, steals: 5, blocks: 4, turnovers: 2 }]
     });
     const current = makeEntry({
       submittedAt: "2026-01-02T00:00:00.000Z",
-      totals: { points: 36, rebounds: 27, assists: 6, steals: 1, blocks: 0, turnovers: 2 },
+      totals: { points: 18, rebounds: 27, assists: 3, steals: 1, blocks: 0, turnovers: 2 },
       stats: [{ playerName: "OGSportsGamer", discordUserId: "456", discordDisplayName: "OGSportsGamer", points: 18, rebounds: 27, assists: 3, steals: 1, blocks: 0, turnovers: 1 }]
     });
 

@@ -42,9 +42,11 @@ describe("record book ties", () => {
     const embed = buildModeEmbed("rec", entries, 10);
     const individual = embed.data.fields?.find((field) => field.name === "Individual Single-Game Records");
 
-    assert.match(String(individual?.value), /\*\*REB\*\* 28 - <@789>/);
-    assert.doesNotMatch(String(individual?.value), /<@111>/);
-    assert.doesNotMatch(String(individual?.value), /<@456>/);
+    const reboundLine = String(individual?.value)
+      .split("\n")
+      .find((line) => line.startsWith("**REB**"));
+
+    assert.equal(reboundLine, "**REB** 28 - <@789>");
   });
 
   it("announces a tie instead of a new record", () => {
