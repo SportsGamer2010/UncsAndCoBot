@@ -3,6 +3,7 @@ import {
   type DetectedRecord,
   type PlayerStatLine,
   type RecordEntry,
+  type RecordHolderRef,
   type RecordScope,
   type RecordStatKey
 } from "./types.js";
@@ -13,25 +14,76 @@ export function detectNewRecords(priorEntries: RecordEntry[], entry: Omit<Record
   const detected: DetectedRecord[] = [];
 
   for (const statKey of PLAYER_RECORD_STATS) {
-    const previousPlayerBest = bestPlayerRecord(priorEntries, statKey);
-    const currentPlayerBest = bestCurrentPlayerRecord(entry.stats, statKey);
-    if (currentPlayerBest && isNewRecord(currentPlayerBest[statKey], previousPlayerBest?.value)) {
+    const previousHolders = getPlayerRecordHolders(priorEntries, statKey);
+    const gameBest = entry.stats.reduce((best, line) => Math.max(best, line[statKey]), 0);
+
+    for (const line of entry.stats) {
+      const value = line[statKey];
+      if (!isRecordOrTie(value, previousHolders?.value) || value !== gameBest) {
+        continue;
+      }
+
+      if (previousHolders && isExistingHolder(line, previousHolders.holders)) {
+        continue;
+      }
+
+      const previous = previousHolders?.holders[0];
       detected.push({
         scope: "player",
         statKey,
-        value: currentPlayerBest[statKey],
-        previousValue: previousPlayerBest?.value,
-        previousPlayerName: previousPlayerBest?.line.playerName,
-        previousDiscordUserId: previousPlayerBest?.line.discordUserId,
-        previousDiscordDisplayName: previousPlayerBest?.line.discordDisplayName,
-        playerName: currentPlayerBest.playerName,
-        discordUserId: currentPlayerBest.discordUserId,
-        discordDisplayName: currentPlayerBest.discordDisplayName
+        value,
+        isTie: previousHolders !== undefined && value === previousHolders.value,
+        previousValue: previousHolders?.value,
+        previousPlayerName: previous?.playerName,
+        previousDiscordUserId: previous?.discordUserId,
+        previousDiscordDisplayName: previous?.discordDisplayName,
+        previousHolders: previousHolders?.holders.map(toHolderRef),
+        playerName: line.playerName,
+        discordUserId: line.discordUserId,
+        discordDisplayName: line.discordDisplayName
       });
     }
   }
 
   return detected;
+}
+
+export function getPlayerRecordHolders(
+  entries: RecordEntry[],
+  statKey: RecordStatKey
+): { value: number; holders: PlayerStatLine[] } | undefined {
+  let bestValue = 0;
+  const holders: PlayerStatLine[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of chronologicalEntries(entries)) {
+    for (const line of entry.stats) {
+      const value = line[statKey];
+      if (value <= 0) {
+        continue;
+      }
+
+      if (value > bestValue) {
+        bestValue = value;
+        holders.length = 0;
+        seen.clear();
+      }
+
+      if (value === bestValue) {
+        const key = recordHolderKey(line);
+        if (!seen.has(key)) {
+          seen.add(key);
+          holders.push(line);
+        }
+      }
+    }
+  }
+
+  if (bestValue <= 0 || holders.length === 0) {
+    return undefined;
+  }
+
+  return { value: bestValue, holders };
 }
 
 export function parseClaimScope(claim: string): { scope: RecordScope; statKey: RecordStatKey } | undefined {
@@ -52,33 +104,35 @@ export function isClaimConfirmed(entry: RecordEntry): boolean {
   return entry.detectedRecords.some((record) => record.scope === parsedClaim.scope && record.statKey === parsedClaim.statKey);
 }
 
-function bestPlayerRecord(entries: RecordEntry[], statKey: RecordStatKey): { value: number; line: PlayerStatLine } | undefined {
-  return entries.reduce<{ value: number; line: PlayerStatLine } | undefined>((best, entry) => {
-    for (const line of entry.stats) {
-      const value = line[statKey];
-      if (!best || value > best.value) {
-        best = { value, line };
-      }
-    }
-
-    return best;
-  }, undefined);
+export function isTiedRecord(record: DetectedRecord): boolean {
+  return record.isTie === true;
 }
 
-function bestCurrentPlayerRecord(lines: PlayerStatLine[], statKey: RecordStatKey): PlayerStatLine | undefined {
-  return lines.reduce<PlayerStatLine | undefined>((best, line) => {
-    if (!best || line[statKey] > best[statKey]) {
-      return line;
-    }
-
-    return best;
-  }, undefined);
-}
-
-function isNewRecord(value: number, previousValue: number | undefined): boolean {
+function isRecordOrTie(value: number, previousValue: number | undefined): boolean {
   if (value <= 0) {
     return false;
   }
 
-  return previousValue === undefined || value > previousValue;
+  return previousValue === undefined || value >= previousValue;
+}
+
+function isExistingHolder(line: PlayerStatLine, holders: PlayerStatLine[]): boolean {
+  const key = recordHolderKey(line);
+  return holders.some((holder) => recordHolderKey(holder) === key);
+}
+
+function recordHolderKey(line: Pick<PlayerStatLine, "playerName" | "discordUserId">): string {
+  return line.discordUserId ?? line.playerName.trim().toLowerCase();
+}
+
+function toHolderRef(line: PlayerStatLine): RecordHolderRef {
+  return {
+    playerName: line.playerName,
+    discordUserId: line.discordUserId,
+    discordDisplayName: line.discordDisplayName
+  };
+}
+
+function chronologicalEntries(entries: RecordEntry[]): RecordEntry[] {
+  return [...entries].sort((left, right) => new Date(left.submittedAt).getTime() - new Date(right.submittedAt).getTime());
 }
