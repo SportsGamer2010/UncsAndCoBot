@@ -18,6 +18,7 @@ import { attachDiscordMembers } from "./members.js";
 import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } from "./ocr.js";
 import { buildModeEmbed, buildOverviewEmbed, buildPublicSubmissionEmbed, buildSubmissionEmbed, publicSubmissionCopy } from "./recordBook.js";
 import { detectNewRecords, parseClaimScope } from "./records.js";
+import { acknowledgeCommand } from "./discordAck.js";
 import { DuplicateScreenshotError, hashImage, RecordBookStore } from "./storage.js";
 import { GAME_MODE_LABELS, GAME_MODES, PLAYER_RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type PlayerStatLine, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
 
@@ -28,6 +29,7 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
   const client = new Client({
     intents: [GatewayIntentBits.Guilds]
   });
+  const pendingAcks = new Map<string, Promise<boolean>>();
 
   client.once("ready", async () => {
     if (!client.user) {
@@ -39,6 +41,17 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
     await registerCommands(client, config).catch((error) => {
       console.error("Failed to register slash commands on startup:", error);
     });
+  });
+
+  client.on("raw", (packet: { t?: string; d?: { id?: string; token?: string; type?: number; data?: { name?: string } } }) => {
+    if (packet.t !== "INTERACTION_CREATE" || packet.d?.type !== 2 || !packet.d.id || !packet.d.token) {
+      return;
+    }
+
+    console.log(`Raw-acking /${packet.d.data?.name ?? "unknown"} before slash-command processing.`);
+    const ack = acknowledgeCommand(packet.d.id, packet.d.token);
+    pendingAcks.set(packet.d.id, ack);
+    void ack;
   });
 
   client.on("guildCreate", async (guild) => {
@@ -64,8 +77,20 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
     }
 
     try {
-      await interaction.deferReply({ ephemeral: true });
+      const rawAck = pendingAcks.get(interaction.id);
+      if (rawAck) {
+        await rawAck;
+        pendingAcks.delete(interaction.id);
+      }
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true }).catch((error) => {
+          console.warn("deferReply after raw ACK:", error);
+        });
+      }
       console.log(`Received /${interaction.commandName} from ${interaction.user.tag} in ${interaction.guild?.name ?? "DM"}`);
+      if (interaction.commandName === "submit-record") {
+        await interaction.editReply("Got it. Reading the box score screenshot...").catch(() => undefined);
+      }
 
       if (interaction.commandName === "recordbook") {
         await handleRecordBookCommand(interaction, config, store);
@@ -169,28 +194,16 @@ async function registerCommands(client: Client, config: AppConfig): Promise<void
     if (guild) {
       await registerGuildCommands(guild, commands);
     }
-    await registerGlobalCommands(client, commands);
     return;
   }
 
   await Promise.all(client.guilds.cache.map((guild) => registerGuildCommands(guild, commands)));
-  await registerGlobalCommands(client, commands);
   console.log(`Registered commands for ${client.guilds.cache.size} guild(s)`);
 }
 
 async function registerGuildCommands(guild: Guild, commands: ReturnType<typeof commandPayloads>): Promise<void> {
   await guild.commands.set(commands);
   console.log(`Registered commands for ${guild.name} (${guild.id})`);
-}
-
-async function registerGlobalCommands(client: Client, commands: ReturnType<typeof commandPayloads>): Promise<void> {
-  if (!client.application) {
-    console.warn("Skipping global command registration because client.application is unavailable.");
-    return;
-  }
-
-  await client.application.commands.set(commands);
-  console.log("Registered global fallback slash commands. Discord can take up to one hour to show global commands.");
 }
 
 async function handleRecordBookCommand(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {

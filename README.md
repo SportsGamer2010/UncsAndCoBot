@@ -119,7 +119,7 @@ Railway should use `railway.json` and the included `Dockerfile` automatically af
 
 The bot listens on Railway's `PORT` at `/health` and only returns HTTP 200 after the Discord gateway is actually logged in. A green Railway deploy with a failed Discord login used to leave slash commands visible while `/submit-record` showed "The application did not respond."
 
-If that error comes back, check Railway logs for `Discord token is valid` / `Discord gateway ready`. Also make sure the Discord Developer Portal has no Interactions Endpoint URL set — this bot acknowledges commands over the gateway, not HTTP.
+`/submit-record` is acknowledged as soon as Discord delivers the interaction, before OCR starts. If an Interactions Endpoint URL is set in the Discord Developer Portal, point it at the Railway service root so the bot can HTTP-ack submits there too.
 
 In production, relative `DATA_DIR` values are forced to `/data` so Railway does not try to write inside the read-only app directory.
 
