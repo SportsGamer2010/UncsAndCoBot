@@ -53,7 +53,9 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
 
   client.on("interactionCreate", async (interaction) => {
     if (interaction.isAutocomplete()) {
-      await handleAutocomplete(interaction);
+      await handleAutocomplete(interaction).catch((error) => {
+        console.warn("Autocomplete handler failed:", error);
+      });
       return;
     }
 
@@ -62,6 +64,8 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
     }
 
     try {
+      console.log(`Received /${interaction.commandName} from ${interaction.user.tag} in ${interaction.guild?.name ?? "DM"}`);
+
       if (interaction.commandName === "recordbook") {
         await handleRecordBookCommand(interaction, config, store);
       }
@@ -210,12 +214,12 @@ async function handleRecordBookCommand(interaction: ChatInputCommandInteraction,
 }
 
 async function handleSubmitRecord(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+
   if (!interaction.guild) {
-    await interaction.reply({ content: "Submissions must be made inside a server.", ephemeral: true });
+    await interaction.editReply("Submissions must be made inside a server.");
     return;
   }
-
-  await interaction.deferReply({ ephemeral: true });
 
   const attachment = interaction.options.getAttachment("screenshot", true);
   if (!isSupportedImage(attachment.name, attachment.contentType)) {
@@ -308,14 +312,19 @@ function applyClaimedHolderFallback(lines: PlayerStatLine[], claimedRecord: Reco
 }
 
 async function handleAutocomplete(interaction: { commandName: string; guild: Guild | null; options: { getFocused(): string | number }; respond(choices: { name: string; value: string }[]): Promise<void> }): Promise<void> {
-  if (interaction.commandName !== "submit-record" || !interaction.guild) {
-    await interaction.respond([]);
-    return;
-  }
+  try {
+    if (interaction.commandName !== "submit-record" || !interaction.guild) {
+      await interaction.respond([]);
+      return;
+    }
 
-  const focused = String(interaction.options.getFocused() ?? "").trim();
-  const members = await searchMembers(interaction.guild, focused);
-  await interaction.respond(members.map(formatMemberChoice));
+    const focused = String(interaction.options.getFocused() ?? "").trim();
+    const members = await searchMembers(interaction.guild, focused);
+    await interaction.respond(members.map(formatMemberChoice));
+  } catch (error) {
+    console.warn("Autocomplete failed:", error);
+    await interaction.respond([]).catch(() => undefined);
+  }
 }
 
 async function searchMembers(guild: Guild, query: string): Promise<GuildMember[]> {
