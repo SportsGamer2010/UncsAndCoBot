@@ -35,8 +35,9 @@ async function main(): Promise<void> {
 
 async function assertDiscordToken(token: string): Promise<void> {
   const rest = new REST({ version: "10" }).setToken(token);
-  const application = (await rest.get(Routes.oauth2CurrentApplication())) as { id?: string; name?: string };
+  const application = (await rest.get(Routes.oauth2CurrentApplication())) as { id?: string; name?: string; verify_key?: string };
   const user = (await rest.get(Routes.user())) as { id?: string; username?: string };
+  healthState.publicKey = application.verify_key;
   console.log(`Discord token is valid for application ${application.name ?? "unknown"} (${application.id ?? "unknown"}) as @${user.username ?? "unknown"} (${user.id ?? "unknown"}).`);
 }
 
