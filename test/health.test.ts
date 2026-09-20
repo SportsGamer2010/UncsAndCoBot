@@ -4,16 +4,31 @@ import { describe, it } from "node:test";
 import { startHealthServer } from "../src/health.js";
 
 describe("startHealthServer", () => {
-  it("answers Railway health checks on /health", async () => {
+  it("fails Railway health checks until Discord is ready", async () => {
     const port = await unusedPort();
-    const server = startHealthServer(String(port));
+    const server = startHealthServer(String(port), () => ({ discordReady: false, lastError: "still logging in" }));
+    assert(server);
+
+    try {
+      await onceListening(server);
+      const response = await fetch(`http://127.0.0.1:${port}/health`);
+      assert.equal(response.status, 503);
+      assert.deepEqual(await response.json(), { status: "starting", discordReady: false, lastError: "still logging in" });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("passes Railway health checks after Discord is ready", async () => {
+    const port = await unusedPort();
+    const server = startHealthServer(String(port), () => ({ discordReady: true }));
     assert(server);
 
     try {
       await onceListening(server);
       const response = await fetch(`http://127.0.0.1:${port}/health`);
       assert.equal(response.status, 200);
-      assert.deepEqual(await response.json(), { status: "ok" });
+      assert.deepEqual(await response.json(), { status: "ok", discordReady: true });
     } finally {
       await closeServer(server);
     }

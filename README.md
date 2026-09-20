@@ -117,7 +117,9 @@ NODE_ENV=production
 
 Railway should use `railway.json` and the included `Dockerfile` automatically after the repository is connected.
 
-The bot listens on Railway's `PORT` at `/health` so the platform health check does not take the Discord process offline. Discord slash commands stay registered even when the service is down, which is why a failed deploy shows "The application did not respond."
+The bot listens on Railway's `PORT` at `/health` and only returns HTTP 200 after the Discord gateway is actually logged in. A green Railway deploy with a failed Discord login used to leave slash commands visible while `/submit-record` showed "The application did not respond."
+
+If that error comes back, check Railway logs for `Discord token is valid` / `Discord gateway ready`. Also make sure the Discord Developer Portal has no Interactions Endpoint URL set — this bot acknowledges commands over the gateway, not HTTP.
 
 In production, relative `DATA_DIR` values are forced to `/data` so Railway does not try to write inside the read-only app directory.
 

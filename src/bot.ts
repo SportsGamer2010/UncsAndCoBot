@@ -64,6 +64,7 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
     }
 
     try {
+      await interaction.deferReply({ ephemeral: true });
       console.log(`Received /${interaction.commandName} from ${interaction.user.tag} in ${interaction.guild?.name ?? "DM"}`);
 
       if (interaction.commandName === "recordbook") {
@@ -161,8 +162,13 @@ async function registerCommands(client: Client, config: AppConfig): Promise<void
 
   if (config.DISCORD_GUILD_ID) {
     console.log(`Registering guild slash commands for configured guild ${config.DISCORD_GUILD_ID}`);
-    const guild = await client.guilds.fetch(config.DISCORD_GUILD_ID);
-    await registerGuildCommands(guild, commands);
+    const guild = await client.guilds.fetch(config.DISCORD_GUILD_ID).catch((error) => {
+      console.error(`Could not fetch configured guild ${config.DISCORD_GUILD_ID}. Is the bot in that server?`, error);
+      return undefined;
+    });
+    if (guild) {
+      await registerGuildCommands(guild, commands);
+    }
     await registerGlobalCommands(client, commands);
     return;
   }
@@ -189,11 +195,10 @@ async function registerGlobalCommands(client: Client, commands: ReturnType<typeo
 
 async function handleRecordBookCommand(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
   if (!interaction.guild) {
-    await interaction.reply({ content: "Record book commands must be used inside a server.", ephemeral: true });
+    await interaction.editReply("Record book commands must be used inside a server.");
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
   const subcommand = interaction.options.getSubcommand();
   if (subcommand === "latest") {
     const data = await store.read();
@@ -214,8 +219,6 @@ async function handleRecordBookCommand(interaction: ChatInputCommandInteraction,
 }
 
 async function handleSubmitRecord(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
-  await interaction.deferReply({ ephemeral: true });
-
   if (!interaction.guild) {
     await interaction.editReply("Submissions must be made inside a server.");
     return;
@@ -353,11 +356,10 @@ function formatMemberChoice(member: GuildMember): { name: string; value: string 
 
 async function handleRecordsCommand(interaction: ChatInputCommandInteraction, config: AppConfig, store: RecordBookStore): Promise<void> {
   if (!interaction.guild) {
-    await interaction.reply({ content: "Records can only be viewed inside a server.", ephemeral: true });
+    await interaction.editReply("Records can only be viewed inside a server.");
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
   const data = await store.read();
   const guildEntries = data.entries.filter((entry) => entry.guildId === interaction.guild?.id);
   const mode = interaction.options.getString("mode") as GameMode | null;

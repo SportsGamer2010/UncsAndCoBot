@@ -20,12 +20,30 @@ const envSchema = z.object({
 
 export type AppConfig = z.infer<typeof envSchema>;
 
-export function getConfig(): AppConfig {
-  const parsed = envSchema.parse(process.env);
+export function getConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const parsed = envSchema.parse({
+    DISCORD_TOKEN: blankToUndefined(env.DISCORD_TOKEN),
+    DISCORD_GUILD_ID: blankToUndefined(env.DISCORD_GUILD_ID),
+    STATISTICS_CATEGORY_NAME: blankToUndefined(env.STATISTICS_CATEGORY_NAME),
+    RECORD_BOOK_CHANNEL_NAME: blankToUndefined(env.RECORD_BOOK_CHANNEL_NAME),
+    DATA_DIR: blankToUndefined(env.DATA_DIR),
+    OCR_LANGUAGE: blankToUndefined(env.OCR_LANGUAGE),
+    MAX_IMAGE_BYTES: blankToUndefined(env.MAX_IMAGE_BYTES),
+    RECORDS_PER_MODE: blankToUndefined(env.RECORDS_PER_MODE)
+  });
+
   return {
     ...parsed,
     DATA_DIR: normalizeDataDir(parsed.DATA_DIR)
   };
+}
+
+function blankToUndefined(value: string | undefined): string | undefined {
+  if (value === undefined || value.trim() === "") {
+    return undefined;
+  }
+
+  return value;
 }
 
 function normalizeDataDir(dataDir: string): string {
