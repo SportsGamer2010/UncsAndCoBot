@@ -66,14 +66,22 @@ export interface ParsedStats {
   confidence?: number;
 }
 
+export interface RecordHolderRef {
+  playerName?: string;
+  discordUserId?: string;
+  discordDisplayName?: string;
+}
+
 export interface DetectedRecord {
   scope: RecordScope;
   statKey: RecordStatKey;
   value: number;
+  isTie?: boolean;
   previousValue?: number;
   previousPlayerName?: string;
   previousDiscordUserId?: string;
   previousDiscordDisplayName?: string;
+  previousHolders?: RecordHolderRef[];
   playerName?: string;
   discordUserId?: string;
   discordDisplayName?: string;

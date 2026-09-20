@@ -1,6 +1,6 @@
 import { EmbedBuilder, type APIEmbedField } from "discord.js";
-import { GAME_MODE_LABELS, GAME_MODES, RECORD_STAT_LABELS, type DetectedRecord, type GameMode, type PlayerStatLine, type RecordEntry, type RecordStatKey } from "./types.js";
-import { isClaimConfirmed, parseClaimScope } from "./records.js";
+import { GAME_MODE_LABELS, GAME_MODES, RECORD_STAT_LABELS, type DetectedRecord, type GameMode, type RecordEntry, type RecordStatKey } from "./types.js";
+import { getPlayerRecordHolders, isClaimConfirmed, isTiedRecord, parseClaimScope } from "./records.js";
 
 const BRAND_COLOR = 0x1f6feb;
 
@@ -75,10 +75,30 @@ export function buildSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
     .setTimestamp(new Date(entry.submittedAt));
 }
 
+export function publicSubmissionCopy(entry: RecordEntry): { title: string; content?: string } {
+  if (entry.detectedRecords.length === 0) {
+    return { title: "Screenshot Reviewed" };
+  }
+
+  if (entry.detectedRecords.every(isTiedRecord)) {
+    return {
+      title: `Tied ${GAME_MODE_LABELS[entry.mode]} Player Record`,
+      content: "Player record tied."
+    };
+  }
+
+  return {
+    title: `New ${GAME_MODE_LABELS[entry.mode]} Player Record`,
+    content: "New player record set."
+  };
+}
+
 export function buildPublicSubmissionEmbed(entry: RecordEntry): EmbedBuilder {
+  const copy = publicSubmissionCopy(entry);
+
   return new EmbedBuilder()
     .setColor(entry.detectedRecords.length > 0 ? 0xf0b429 : 0x1f6feb)
-    .setTitle(entry.detectedRecords.length > 0 ? `New ${GAME_MODE_LABELS[entry.mode]} Player Record` : "Screenshot Reviewed")
+    .setTitle(copy.title)
     .setDescription(entry.detectedRecords.length > 0 ? formatDetectedRecords(entry.detectedRecords) : "No new saved player record was detected from this screenshot.")
     .addFields({
       name: "Record Holder",
@@ -118,21 +138,12 @@ function buildModeFields(entries: RecordEntry[], recordsPerMode: number): APIEmb
 function formatIndividualRecords(entries: RecordEntry[], recordsPerMode: number): string {
   return DISPLAY_RECORD_STATS
     .map((key) => {
-      const best = entries.reduce<{ entry: RecordEntry; line: PlayerStatLine } | undefined>((currentBest, entry) => {
-        for (const line of entry.stats) {
-          if (!currentBest || line[key] > currentBest.line[key]) {
-            currentBest = { entry, line };
-          }
-        }
-
-        return currentBest;
-      }, undefined);
-
+      const best = getPlayerRecordHolders(entries, key);
       if (!best) {
         return undefined;
       }
 
-      return `**${RECORD_STAT_LABELS[key]}** ${best.line[key]} - ${formatPlayer(best.line)}`;
+      return `**${RECORD_STAT_LABELS[key]}** ${best.value} - ${best.holders.map(formatPlayer).join(", ")}`;
     })
     .filter(Boolean)
     .slice(0, recordsPerMode)
@@ -160,8 +171,14 @@ function formatDetectedRecords(records: DetectedRecord[]): string {
   return records
     .map((record) => {
       const holder = record.scope === "player" ? ` - ${record.discordUserId ? `<@${record.discordUserId}>` : record.discordDisplayName ?? record.playerName ?? "Unknown player"}` : "";
-      const previous = record.previousValue === undefined ? "first saved mark" : `previous ${record.previousValue}`;
-      return `NEW **${record.scope === "team" ? "Team" : "Player"} ${RECORD_STAT_LABELS[record.statKey]}** ${record.value}${holder} (${previous})`;
+      const previous =
+        record.previousValue === undefined
+          ? "first saved mark"
+          : isTiedRecord(record)
+            ? `tied existing ${record.previousValue}`
+            : `previous ${record.previousValue}`;
+      const kind = isTiedRecord(record) ? "TIED" : "NEW";
+      return `${kind} **${record.scope === "team" ? "Team" : "Player"} ${RECORD_STAT_LABELS[record.statKey]}** ${record.value}${holder} (${previous})`;
     })
     .join("\n")
     .slice(0, 1024);

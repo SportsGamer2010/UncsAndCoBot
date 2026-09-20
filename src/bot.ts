@@ -16,7 +16,7 @@ import { syncAchievementRoles } from "./achievements.js";
 import type { AppConfig } from "./config.js";
 import { attachDiscordMembers } from "./members.js";
 import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } from "./ocr.js";
-import { buildModeEmbed, buildOverviewEmbed, buildPublicSubmissionEmbed, buildSubmissionEmbed } from "./recordBook.js";
+import { buildModeEmbed, buildOverviewEmbed, buildPublicSubmissionEmbed, buildSubmissionEmbed, publicSubmissionCopy } from "./recordBook.js";
 import { detectNewRecords, parseClaimScope } from "./records.js";
 import { DuplicateScreenshotError, hashImage, RecordBookStore } from "./storage.js";
 import { GAME_MODE_LABELS, GAME_MODES, PLAYER_RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type PlayerStatLine, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
@@ -268,7 +268,7 @@ async function handleSubmitRecord(interaction: ChatInputCommandInteraction, conf
   await syncAchievementRoles(interaction.guild, entry).catch((error) => {
     console.error("Failed to sync achievement roles:", error);
   });
-  await channel.send({ content: entry.detectedRecords.length > 0 ? "New player record set." : undefined, embeds: [buildPublicSubmissionEmbed(entry)] });
+  await channel.send({ content: publicSubmissionCopy(entry).content, embeds: [buildPublicSubmissionEmbed(entry)] });
   await publishRecordBook(interaction.guild, channel, config, store);
 
   await interaction.editReply(`Saved ${GAME_MODE_LABELS[mode]} player-record submission for <@${claimedRecordHolderMember.id}>. The record book has been refreshed in ${channel}.`);

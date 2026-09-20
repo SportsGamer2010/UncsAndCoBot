@@ -16,10 +16,10 @@ Players submit end-of-game box score screenshots with `/submit-record`. The bot 
 - Asks players which player record was set
 - Links the submitted player record to a Discord member
 - Extracts stat rows from the screenshot with local Tesseract OCR
-- Compares OCR stats against saved mode records and flags newly broken records
-- Posts a group-visible notification when a new player record is set
+- Compares OCR stats against saved mode records and flags newly broken or tied records
+- Posts a group-visible notification when a player record is set or tied
 - Keeps detailed OCR/submission info admin-only through `/recordbook latest`
-- Awards mode/stat record-holder roles for verified individual records when Discord member matching succeeds
+- Awards mode/stat record-holder roles for verified individual records when Discord member matching succeeds, keeps existing roles on ties, and removes them when a later mark breaks the tie
 - Saves every valid record to `data/record-book.json`
 - Prevents duplicate screenshot submissions by image hash
 - Publishes single-game player records for points, rebounds, assists, steals, and blocks

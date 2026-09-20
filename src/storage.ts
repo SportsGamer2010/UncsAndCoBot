@@ -26,14 +26,22 @@ const statTotalsSchema = z.object({
   turnovers: z.number()
 });
 
+const recordHolderRefSchema = z.object({
+  playerName: z.string().optional(),
+  discordUserId: z.string().optional(),
+  discordDisplayName: z.string().optional()
+});
+
 const detectedRecordSchema = z.object({
   scope: z.enum(["player", "team"]),
   statKey: z.enum(RECORD_STAT_KEYS),
   value: z.number(),
+  isTie: z.boolean().optional(),
   previousValue: z.number().optional(),
   previousPlayerName: z.string().optional(),
   previousDiscordUserId: z.string().optional(),
   previousDiscordDisplayName: z.string().optional(),
+  previousHolders: z.array(recordHolderRefSchema).optional(),
   playerName: z.string().optional(),
   discordUserId: z.string().optional(),
   discordDisplayName: z.string().optional()
