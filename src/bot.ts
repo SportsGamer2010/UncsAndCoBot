@@ -19,6 +19,13 @@ import { downloadImage, extractStatsFromImage, isSupportedImage, totalStats } fr
 import { buildModeEmbed, buildOverviewEmbed, buildPublicSubmissionEmbed, buildSubmissionEmbed, publicSubmissionCopy } from "./recordBook.js";
 import { detectNewRecords, parseClaimScope } from "./records.js";
 import { acknowledgeCommand } from "./discordAck.js";
+import {
+  buildScrimTeamsEmbed,
+  isGuildTextChannelType,
+  ScrimTeamsStore,
+  type ScrimPlayer,
+  type ScrimTeamsSnapshot
+} from "./scrimTeams.js";
 import { DuplicateScreenshotError, hashImage, RecordBookStore } from "./storage.js";
 import { GAME_MODE_LABELS, GAME_MODES, PLAYER_RECORD_CLAIMS, RECORD_STAT_LABELS, type GameMode, type PlayerStatLine, type PublishedRecordBook, type RecordClaim, type RecordEntry, type RecordScope } from "./types.js";
 
@@ -29,6 +36,7 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
   const client = new Client({
     intents: [GatewayIntentBits.Guilds]
   });
+  const scrimTeamsStore = new ScrimTeamsStore(config.DATA_DIR);
   const pendingAcks = new Map<string, Promise<boolean>>();
 
   client.once("ready", async () => {
@@ -107,6 +115,10 @@ export function createBot(config: AppConfig, store: RecordBookStore): Client {
       if (interaction.commandName === "team-records") {
         await handleRecordsCommand(interaction, config, store);
       }
+
+      if (interaction.commandName === "scrim-teams") {
+        await handleScrimTeamsCommand(interaction, scrimTeamsStore);
+      }
     } catch (error) {
       console.error(error);
       await safeInteractionReply(interaction, friendlyError(error));
@@ -167,7 +179,27 @@ function commandPayloads() {
     .addSubcommand((subcommand) => subcommand.setName("refresh").setDescription("Refresh record-book embeds from saved submissions."))
     .addSubcommand((subcommand) => subcommand.setName("latest").setDescription("View the latest saved submission details privately."));
 
-  return [submitRecord.toJSON(), records.toJSON(), teamRecords.toJSON(), recordBook.toJSON()];
+  const scrimTeams = new SlashCommandBuilder()
+    .setName("scrim-teams")
+    .setDescription("Save or show the current scrim teams so nobody has to scroll.")
+    .addSubcommand((subcommand) => {
+      let builder = subcommand.setName("set").setDescription("Save the current Team 1 / Team 2 lineups (use in #scrims).");
+      builder = builder
+        .addStringOption((option) => option.setName("team1_name").setDescription("Team 1 name").setRequired(true))
+        .addStringOption((option) => option.setName("team2_name").setDescription("Team 2 name").setRequired(true));
+      for (const team of [1, 2] as const) {
+        for (let slot = 1; slot <= 5; slot += 1) {
+          const optionName = `team${team}_player${slot}`;
+          builder = builder.addUserOption((option) =>
+            option.setName(optionName).setDescription(`Team ${team} player ${slot}`).setRequired(true)
+          );
+        }
+      }
+      return builder;
+    })
+    .addSubcommand((subcommand) => subcommand.setName("show").setDescription("Post the saved scrim teams in this text channel."));
+
+  return [submitRecord.toJSON(), records.toJSON(), teamRecords.toJSON(), recordBook.toJSON(), scrimTeams.toJSON()];
 }
 
 function recordClaimChoices(): { name: string; value: RecordClaim }[] {
@@ -379,6 +411,76 @@ async function handleRecordsCommand(interaction: ChatInputCommandInteraction, co
   const embeds = mode ? [buildModeEmbed(mode, guildEntries, config.RECORDS_PER_MODE)] : GAME_MODES.map((gameMode) => buildModeEmbed(gameMode, guildEntries, config.RECORDS_PER_MODE));
 
   await interaction.editReply({ embeds });
+}
+
+async function handleScrimTeamsCommand(interaction: ChatInputCommandInteraction, store: ScrimTeamsStore): Promise<void> {
+  if (!interaction.guild) {
+    await interaction.editReply("Scrim team commands must be used inside a server.");
+    return;
+  }
+
+  const channel = interaction.channel;
+  if (!channel || !("send" in channel) || !isGuildTextChannelType(channel.type)) {
+    await interaction.editReply("Use `/scrim-teams` in a text channel (like #scrims). Voice and other channel types are not supported.");
+    return;
+  }
+
+  const subcommand = interaction.options.getSubcommand();
+  if (subcommand === "set") {
+    const snapshot = readScrimTeamsFromInteraction(interaction);
+    await store.set(snapshot);
+    await channel.send({ embeds: [buildScrimTeamsEmbed(snapshot)] });
+    await interaction.editReply("Saved current scrim teams and posted them in this channel.");
+    return;
+  }
+
+  if (subcommand === "show") {
+    const snapshot = await store.get(interaction.guild.id);
+    if (!snapshot) {
+      await interaction.editReply("No scrim teams saved yet. Run `/scrim-teams set` in #scrims first.");
+      return;
+    }
+
+    await channel.send({ embeds: [buildScrimTeamsEmbed(snapshot)] });
+    await interaction.editReply("Posted the current scrim teams in this channel.");
+  }
+}
+
+function readScrimTeamsFromInteraction(interaction: ChatInputCommandInteraction): ScrimTeamsSnapshot {
+  if (!interaction.guild) {
+    throw new Error("Scrim team commands must be used inside a server.");
+  }
+
+  const team1Name = interaction.options.getString("team1_name", true).trim();
+  const team2Name = interaction.options.getString("team2_name", true).trim();
+  if (!team1Name || !team2Name) {
+    throw new Error("Team names cannot be empty.");
+  }
+
+  return {
+    guildId: interaction.guild.id,
+    channelId: interaction.channelId,
+    team1Name,
+    team2Name,
+    team1: readTeamPlayers(interaction, 1),
+    team2: readTeamPlayers(interaction, 2),
+    updatedById: interaction.user.id,
+    updatedByTag: interaction.member && "displayName" in interaction.member ? String(interaction.member.displayName) : interaction.user.username,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function readTeamPlayers(interaction: ChatInputCommandInteraction, team: 1 | 2): ScrimPlayer[] {
+  const players: ScrimPlayer[] = [];
+  for (let slot = 1; slot <= 5; slot += 1) {
+    const user = interaction.options.getUser(`team${team}_player${slot}`, true);
+    players.push({
+      id: user.id,
+      tag: user.tag,
+      displayName: user.displayName || user.username
+    });
+  }
+  return players;
 }
 
 async function ensureRecordBookChannel(guild: Guild, config: AppConfig): Promise<TextChannel> {
